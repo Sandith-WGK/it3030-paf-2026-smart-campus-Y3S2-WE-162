@@ -27,6 +27,4 @@ public interface ResourceRepository extends MongoRepository<Resource, String> {
     // Search by type AND status
     List<Resource> findByTypeAndStatus(ResourceType type, ResourceStatus status);
 
-    // All active resources
-    List<Resource> findByStatus(ResourceStatus status);
 }
