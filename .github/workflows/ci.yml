@@ -23,12 +23,14 @@ jobs:
       - name: Test Backend
         run: mvn -B test --file backend/smart-campus-api/pom.xml
 
-      # --- Frontend ---
+      # --- Frontend (skipped until frontend/package.json exists) ---
       - name: Set up Node.js
+        if: hashFiles('frontend/package.json') != ''
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Modern LTS Node version
+          node-version: '20'
 
       - name: Build Frontend
-        working-directory: ./frontend
+        if: hashFiles('frontend/package.json') != ''
+        working-directory: frontend
         run: npm install && npm run build
