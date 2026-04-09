@@ -15,9 +15,25 @@ const AuthCallback = () => {
     const error = searchParams.get('error');
 
     if (token) {
-      // Successfully authenticated
-      login(token);
-      navigate('/dashboard', { replace: true });
+      // Decode the JWT payload (base64) to read the role claim
+      try {
+        const payloadBase64 = token.split('.')[1];
+        const payload = JSON.parse(atob(payloadBase64));
+        const role = payload?.role || 'USER';
+
+        login(token);
+
+        // Route based on role
+        if (role === 'ADMIN') {
+          navigate('/admin/users', { replace: true });
+        } else {
+          navigate('/dashboard', { replace: true });
+        }
+      } catch (e) {
+        // Fallback if decoding fails
+        login(token);
+        navigate('/dashboard', { replace: true });
+      }
     } else if (error) {
       // Handle authentication error
       setErrorMsg(error);

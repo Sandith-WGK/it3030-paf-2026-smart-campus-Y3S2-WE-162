@@ -28,10 +28,20 @@ public class User {
 
     private String picture; // Google profile photo URL
 
-    private String provider; // "GOOGLE"
+    private String provider; // "GOOGLE" or "LOCAL"
+
+    private String password; // Hashed password for local auth
 
     @Builder.Default
     private Role role = Role.USER; // default role for new users
+
+    @Builder.Default
+    private boolean enabled = false; // user must verify email to be enabled
+
+    private String verificationCode;
+
+    private String resetCode;
+    private Instant resetCodeExpiresAt;
 
     @CreatedDate
     private Instant createdAt;
