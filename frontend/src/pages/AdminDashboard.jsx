@@ -1,0 +1,539 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { motion, AnimatePresence } from 'framer-motion';
+import { userService } from '../services/api/userService';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
+} from 'recharts';
+import { 
+  Moon, Sun, Search, FileDown, Plus, Edit2, Trash2, X, Brain, CheckCircle
+} from 'lucide-react';
+
+const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981'];
+
+export default function AdminDashboard() {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [darkMode, setDarkMode] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState('ALL');
+  const [isExporting, setIsExporting] = useState(false);
+  
+  // Modals state
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [newUserData, setNewUserData] = useState({ email: '', name: '', role: 'USER' });
+
+  useEffect(() => {
+    fetchUsers();
+    // Check system pref for dark mode
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const data = await userService.getAllUsers();
+      setUsers(data);
+    } catch (err) {
+      console.error('Failed to fetch users', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleDarkMode = () => {
+    setDarkMode(!darkMode);
+    if (!darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Handlers
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm("Are you sure you want to delete this user?")) {
+      await userService.deleteUser(id);
+      fetchUsers();
+    }
+  };
+
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    await userService.createUser(newUserData);
+    setIsCreateModalOpen(false);
+    setNewUserData({ email: '', name: '', role: 'USER' });
+    fetchUsers();
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    await userService.updateUserRole(editingUser.id, editingUser.role);
+    setIsEditModalOpen(false);
+    fetchUsers();
+  };
+
+  const exportToPDF = async () => {
+    if (users.length === 0 || isExporting) return;
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF();
+      const now = new Date();
+
+      // ── Header banner ──────────────────────────────────────────
+      doc.setFillColor(109, 40, 217);
+      doc.rect(0, 0, 210, 28, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Smart Campus — User Management Report', 14, 12);
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${now.toLocaleString()}`, 14, 20);
+
+      // ── Summary ────────────────────────────────────────────────
+      doc.setTextColor(30, 30, 30);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Summary', 14, 38);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Users: ${users.length}`, 14, 46);
+      const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc; }, {});
+      const roleText = Object.entries(roleCounts).map(([r, c]) => `${r}: ${c}`).join('   |   ');
+      doc.text(`Role Breakdown: ${roleText}`, 14, 53);
+      doc.text(`Active Roles: ${Object.keys(roleCounts).length}`, 14, 60);
+
+      // ── Analytics header ───────────────────────────────────────
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('Analytics Overview', 14, 72);
+
+      const roleChartColors = [[139, 92, 246], [245, 158, 11], [59, 130, 246], [16, 185, 129]];
+
+      // ── LEFT: Role Distribution (horizontal proportion bars) ───
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Role Distribution', 14, 80);
+      let legendY = 85;
+      roleDistribution.forEach((item, idx) => {
+        const pct = item.value / users.length;
+        const barW = Math.max(5, 80 * pct);
+        doc.setFillColor(...roleChartColors[idx % roleChartColors.length]);
+        doc.roundedRect(14, legendY, barW, 8, 1, 1, 'F');
+        doc.setTextColor(60, 60, 60);
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`${item.name}: ${item.value} (${Math.round(pct * 100)}%)`, 14 + barW + 3, legendY + 5.5);
+        legendY += 12;
+      });
+
+      // ── RIGHT: Registrations Over Time (bar chart) ─────────────
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('Registrations Over Time', 115, 80);
+      if (registrationsByDate.length > 0) {
+        const maxCount = Math.max(...registrationsByDate.map(d => d.count));
+        const chartLeft = 115;
+        const chartWidth = 80;
+        const chartHeight = 45;
+        const chartTop = 84;
+        const slotW = chartWidth / registrationsByDate.length;
+        const barW = slotW * 0.6;
+        registrationsByDate.forEach((item, idx) => {
+          const barH = (item.count / maxCount) * chartHeight;
+          const x = chartLeft + idx * slotW + (slotW - barW) / 2;
+          const y = chartTop + chartHeight - barH;
+          doc.setFillColor(139, 92, 246);
+          doc.roundedRect(x, y, barW, barH, 1, 1, 'F');
+          doc.setFontSize(6);
+          doc.setTextColor(120);
+          doc.text(item.date, x + barW / 2, chartTop + chartHeight + 5, { align: 'center' });
+        });
+        doc.setDrawColor(210, 210, 210);
+        doc.line(chartLeft, chartTop + chartHeight, chartLeft + chartWidth, chartTop + chartHeight);
+      }
+
+      // ── Divider between charts and table ───────────────────────
+      const sectionEnd = Math.max(legendY, 142);
+      doc.setDrawColor(210, 210, 210);
+      doc.line(14, sectionEnd, 196, sectionEnd);
+
+      // ── User table ─────────────────────────────────────────────
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(30, 30, 30);
+      doc.text('User Details', 14, sectionEnd + 8);
+
+      const tableRows = users.map((u, idx) => [
+        idx + 1, u.name || '—', u.email, u.role,
+        u.provider || 'GOOGLE',
+        u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A',
+      ]);
+
+      autoTable(doc, {
+        startY: sectionEnd + 13,
+        head: [['#', 'Name', 'Email', 'Role', 'Provider', 'Joined']],
+        body: tableRows,
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [109, 40, 217], textColor: 255, fontStyle: 'bold' },
+        alternateRowStyles: { fillColor: [245, 243, 255] },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          3: { halign: 'center' },
+          4: { halign: 'center' },
+          5: { halign: 'center' },
+        },
+      });
+
+      // ── Footer ─────────────────────────────────────────────────
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(
+          `Smart Campus Operations Hub  •  Page ${i} of ${pageCount}`,
+          14,
+          doc.internal.pageSize.height - 8
+        );
+      }
+
+      doc.save(`SmartCampus_UserReport_${now.toISOString().split('T')[0]}.pdf`);
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Derived state
+  const filteredUsers = useMemo(() => {
+    return users.filter(user => {
+      const matchRole = roleFilter === 'ALL' || user.role === roleFilter;
+      const matchSearch = (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
+                          (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      return matchRole && matchSearch;
+    });
+  }, [users, searchTerm, roleFilter]);
+
+  const roleDistribution = useMemo(() => {
+    const dist = users.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.keys(dist).map(key => ({ name: key, value: dist[key] }));
+  }, [users]);
+
+  const registrationsByDate = useMemo(() => {
+    const dist = users.reduce((acc, user) => {
+      if(!user.createdAt) return acc;
+      const date = new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.keys(dist).map(key => ({ date: key, count: dist[key] })).slice(-7); // Last 7 unique days
+  }, [users]);
+
+  const generateAIAssessment = () => {
+    if (users.length === 0) return "Gathering data...";
+    const admins = users.filter(u => u.role === 'ADMIN').length;
+    const techs = users.filter(u => u.role === 'TECHNICIAN').length;
+    
+    if (admins > users.length / 2) return "⚠️ High number of Admins. Consider reviewing access controls.";
+    if (techs === 0) return "💡 You have no Technicians. Operations may stall.";
+    return "✅ System health is optimal. Role distribution looks balanced.";
+  }
+
+  return (
+    <div className={`min-h-dvh transition-colors duration-300 w-full font-sans antialiased flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
+      
+      {/* Header */}
+      <header className="px-8 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
+            <span className="text-white font-bold text-sm">SC</span>
+          </div>
+          <h1 className="font-bold text-xl tracking-tight">Admin<span className="text-violet-600 dark:text-violet-400">Sphere</span></h1>
+        </div>
+        <div className="flex items-center gap-4">
+          <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
+            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          <button onClick={handleLogout} className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white px-4 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 transition-colors">
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      <main className="flex-1 p-8 max-w-7xl mx-auto w-full space-y-8">
+        
+        {/* Top Widgets */}
+        <div className="grid gap-6 md:grid-cols-3">
+          {/* AI Widget */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="col-span-1 rounded-2xl border border-zinc-200 bg-white/80 p-6 shadow-sm backdrop-blur-sm dark:border-zinc-800 dark:bg-zinc-900/80 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Brain size={100} />
+            </div>
+            <div className="flex items-center gap-2 mb-4">
+              <Brain className="text-violet-500" size={24} />
+              <h2 className="text-lg font-semibold">AI Insights</h2>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-300 relative z-10 font-medium">
+              {generateAIAssessment()}
+            </p>
+            <div className="mt-6 flex items-center gap-2 text-sm text-zinc-500">
+              <CheckCircle size={16} className="text-green-500" /> System running smoothly
+            </div>
+          </motion.div>
+
+          {/* Quick Stats */}
+          <div className="col-span-2 grid grid-cols-2 gap-6">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-center">
+              <h3 className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Total Users</h3>
+              <p className="text-4xl font-bold mt-2 text-violet-600 dark:text-violet-400">{users.length}</p>
+            </motion.div>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 flex flex-col justify-center">
+              <h3 className="text-sm text-zinc-500 dark:text-zinc-400 font-medium">Active Roles</h3>
+              <p className="text-4xl font-bold mt-2 text-amber-500">{roleDistribution.length}</p>
+            </motion.div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Pie Chart */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 h-[350px] flex flex-col">
+            <h2 className="text-lg font-semibold mb-4">Role Distribution</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={roleDistribution} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                    {roleDistribution.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: darkMode ? '#18181b' : '#fff', color: darkMode ? '#fff' : '#000', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Legend verticalAlign="bottom" height={36} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+
+          {/* Bar Chart */}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }} className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 h-[350px] flex flex-col">
+            <h2 className="text-lg font-semibold mb-4">Registrations Over Time</h2>
+            <div className="flex-1 min-h-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={registrationsByDate}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? '#3f3f46' : '#e4e4e7'} />
+                  <XAxis dataKey="date" stroke={darkMode ? '#a1a1aa' : '#71717a'} fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke={darkMode ? '#a1a1aa' : '#71717a'} fontSize={12} tickLine={false} axisLine={false} />
+                  <Tooltip cursor={{ fill: darkMode ? '#27272a' : '#f4f4f5' }} contentStyle={{ borderRadius: '12px', border: 'none', backgroundColor: darkMode ? '#18181b' : '#fff', color: darkMode ? '#fff' : '#000' }} />
+                  <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* User Table Section */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} className="rounded-2xl border border-zinc-200 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900 overflow-hidden">
+          
+          {/* Table Tools */}
+          <div className="p-6 border-b border-zinc-200 dark:border-zinc-800 flex flex-col md:flex-row gap-4 justify-between items-center bg-zinc-50/50 dark:bg-zinc-900/50">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search users..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+                />
+              </div>
+              <select 
+                value={roleFilter} 
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="py-2 px-4 rounded-xl border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="USER">User</option>
+                <option value="ADMIN">Admin</option>
+                <option value="TECHNICIAN">Technician</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <button 
+                onClick={exportToPDF} 
+                disabled={isExporting}
+                className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-zinc-700 bg-white border border-zinc-200 rounded-xl hover:bg-zinc-50 dark:bg-zinc-950 dark:text-zinc-300 dark:border-zinc-700 dark:hover:bg-zinc-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isExporting ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
+                    Generating PDF...
+                  </>
+                ) : (
+                  <><FileDown size={16} /> Export PDF Report</>
+                )}
+              </button>
+              <button onClick={() => setIsCreateModalOpen(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors shadow-sm shadow-violet-600/20">
+                <Plus size={16} /> Add User
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
+              <thead className="bg-zinc-50 text-xs uppercase text-zinc-500 dark:bg-zinc-900/50 dark:text-zinc-500">
+                <tr>
+                  <th className="px-6 py-4 font-semibold">User</th>
+                  <th className="px-6 py-4 font-semibold">Role</th>
+                  <th className="px-6 py-4 font-semibold">Joined</th>
+                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-200 dark:divide-zinc-800">
+                {loading ? (
+                  <tr><td colSpan="4" className="px-6 py-8 text-center text-zinc-500">Loading users...</td></tr>
+                ) : filteredUsers.length === 0 ? (
+                  <tr><td colSpan="4" className="px-6 py-8 text-center text-zinc-500">No users found.</td></tr>
+                ) : (
+                  filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img src={user.picture || `https://ui-avatars.com/api/?name=${user.name || user.email}&background=random`} alt="" className="w-9 h-9 rounded-full object-cover" />
+                          <div>
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100">{user.name || 'Unnamed User'}</div>
+                            <div className="text-zinc-500 text-xs">{user.email}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          user.role === 'ADMIN' ? 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-400' :
+                          user.role === 'TECHNICIAN' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' :
+                          'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300'
+                        }`}>
+                          {user.role}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => { setEditingUser(user); setIsEditModalOpen(true); }} className="p-2 text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-lg transition-colors">
+                            <Edit2 size={16} />
+                          </button>
+                          <button onClick={() => handleDelete(user.id)} className="p-2 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 dark:hover:text-red-400 rounded-lg transition-colors">
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+          
+        </motion.div>
+
+      </main>
+
+      {/* CREATE MODAL */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm shadow-2xl">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+              <div className="flex justify-between items-center p-6 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-lg">Add New User</h3>
+                <button onClick={() => setIsCreateModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><X size={20} /></button>
+              </div>
+              <form onSubmit={handleCreateUser} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Email Address</label>
+                  <input required type="email" value={newUserData.email} onChange={e => setNewUserData({...newUserData, email: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700" placeholder="jane@smartcampus.edu" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Full Name</label>
+                  <input required type="text" value={newUserData.name} onChange={e => setNewUserData({...newUserData, name: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700" placeholder="Jane Doe" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Assign Role</label>
+                  <select value={newUserData.role} onChange={e => setNewUserData({...newUserData, role: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700">
+                    <option value="USER">User</option>
+                    <option value="TECHNICIAN">Technician</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+                  <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors">Create User</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* EDIT MODAL */}
+      <AnimatePresence>
+        {isEditModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm shadow-2xl">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
+              <div className="flex justify-between items-center p-6 border-b border-zinc-200 dark:border-zinc-800">
+                <h3 className="font-semibold text-lg">Edit User Role</h3>
+                <button onClick={() => setIsEditModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><X size={20} /></button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
+                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl mb-4">
+                  <p className="text-sm font-medium">{editingUser?.name || 'Unnamed'}</p>
+                  <p className="text-xs text-zinc-500">{editingUser?.email}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Update Role</label>
+                  <select value={editingUser?.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700">
+                    <option value="USER">User</option>
+                    <option value="TECHNICIAN">Technician</option>
+                    <option value="ADMIN">Admin</option>
+                  </select>
+                </div>
+                <div className="pt-4 flex justify-end gap-3">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
+                  <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors">Save Changes</button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

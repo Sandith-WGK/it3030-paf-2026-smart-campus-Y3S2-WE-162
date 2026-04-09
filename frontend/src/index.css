@@ -1,6 +1,9 @@
 /* v4: do not use @config with a legacy tailwind.config.js here — it prevents class scanning from JSX. */
 @import 'tailwindcss';
 
+/* Enable class-based dark mode in Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
 }
