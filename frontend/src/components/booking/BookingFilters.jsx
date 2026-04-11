@@ -12,10 +12,11 @@ export default function BookingFilters({ filters, onChange }) {
 
   useEffect(() => {
     resourceService
-      .getResources()
+      .getResources({ status: 'ACTIVE' })
       .then((res) => {
         const raw = res.data?.data ?? res.data;
-        setResources(Array.isArray(raw) ? raw : []);
+        const list = Array.isArray(raw) ? raw : [];
+        setResources(list.filter((r) => r.status === 'ACTIVE'));
       })
       .catch(() => {});
   }, []);

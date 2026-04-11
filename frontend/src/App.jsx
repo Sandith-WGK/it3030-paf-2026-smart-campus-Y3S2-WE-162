@@ -51,7 +51,7 @@ function App() {
       <Route path="/bookings/:id/edit" element={<PrivateRoute><EditBooking /></PrivateRoute>} />
 
       {/* Admin routes */}
-      <Route path="/admin/users" element={<PrivateRoute><AdminDashboard /></PrivateRoute>} />
+      <Route path="/admin/users" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       <Route path="/admin/bookings" element={<AdminRoute><AdminBookings /></AdminRoute>} />
 
       {/* Fallback */}
