@@ -1,6 +1,48 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import resourceService from '../../services/api/resourceService';
+import bookingService from '../../services/api/bookingService';
 import { Loader2 } from 'lucide-react';
+
+function timeToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToTime(m) {
+  const h = Math.floor(m / 60);
+  const min = m % 60;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+function computeAvailableSlots(bookings, windowStart, windowEnd) {
+  const wsMin = timeToMinutes(windowStart);
+  const weMin = timeToMinutes(windowEnd);
+
+  const sorted = [...bookings].sort((a, b) =>
+    timeToMinutes(a.startTime) - timeToMinutes(b.startTime),
+  );
+
+  const gaps = [];
+  let cursor = wsMin;
+
+  for (const b of sorted) {
+    const bStart = timeToMinutes(b.startTime);
+    const bEnd = timeToMinutes(b.endTime);
+    if (bStart > cursor) {
+      const gapEnd = Math.min(bStart, weMin);
+      if (gapEnd - cursor >= 30) {
+        gaps.push({ start: minutesToTime(cursor), end: minutesToTime(gapEnd) });
+      }
+    }
+    cursor = Math.max(cursor, bEnd);
+  }
+
+  if (cursor < weMin && weMin - cursor >= 30) {
+    gaps.push({ start: minutesToTime(cursor), end: minutesToTime(weMin) });
+  }
+
+  return gaps;
+}
 
 const inputClass =
   'w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:placeholder-zinc-500';
@@ -27,6 +69,43 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
     () => resources.find((r) => r.id === form.resourceId) ?? null,
     [resources, form.resourceId],
   );
+
+  // When using a fixed resource (edit/rebook), we still need its availability window
+  const [fixedResource, setFixedResource] = useState(null);
+  useEffect(() => {
+    if (!fixedResourceId) return;
+    resourceService
+      .getResourceById(fixedResourceId)
+      .then((res) => setFixedResource(res.data?.data ?? res.data ?? null))
+      .catch(() => setFixedResource(null));
+  }, [fixedResourceId]);
+
+  // The resource whose availability window we use for slot computation
+  const activeResource = fixedResourceId ? fixedResource : selectedResource;
+
+  // Available slot chips
+  const [slots, setSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  const activeResourceId = fixedResourceId || form.resourceId;
+
+  useEffect(() => {
+    if (!activeResourceId || !form.date) {
+      setSlots([]);
+      return;
+    }
+    setSlotsLoading(true);
+    bookingService
+      .getResourceSchedule(activeResourceId, form.date)
+      .then((res) => {
+        const approved = res.data?.data ?? res.data ?? [];
+        const windowStart = activeResource?.availabilityStart ?? '07:00';
+        const windowEnd = activeResource?.availabilityEnd ?? '22:00';
+        setSlots(computeAvailableSlots(Array.isArray(approved) ? approved : [], windowStart, windowEnd));
+      })
+      .catch(() => setSlots([]))
+      .finally(() => setSlotsLoading(false));
+  }, [activeResourceId, form.date, activeResource]);
 
   // Load resources for the picker (only when no fixed resource)
   useEffect(() => {
@@ -166,6 +245,49 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
           {errors.endTime && <p className={errorClass}>{errors.endTime}</p>}
         </div>
       </div>
+
+      {/* Smart slot suggestions */}
+      {(activeResourceId && form.date) && (
+        <div>
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">
+            Available time slots
+          </p>
+          {slotsLoading ? (
+            <div className="flex items-center gap-2 text-xs text-zinc-400">
+              <Loader2 size={12} className="animate-spin" />
+              Checking availability…
+            </div>
+          ) : slots.length === 0 ? (
+            <p className="text-xs text-zinc-400 dark:text-zinc-500 italic">
+              No available slots on this date.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {slots.map((slot) => {
+                const isSelected =
+                  form.startTime === slot.start && form.endTime === slot.end;
+                return (
+                  <button
+                    key={`${slot.start}-${slot.end}`}
+                    type="button"
+                    onClick={() => {
+                      setForm((f) => ({ ...f, startTime: slot.start, endTime: slot.end }));
+                      setErrors((er) => ({ ...er, startTime: undefined, endTime: undefined }));
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      isSelected
+                        ? 'bg-violet-600 text-white'
+                        : 'bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-500/10 dark:text-violet-300 dark:hover:bg-violet-500/20'
+                    }`}
+                  >
+                    {slot.start} – {slot.end}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Purpose */}
       <div>
