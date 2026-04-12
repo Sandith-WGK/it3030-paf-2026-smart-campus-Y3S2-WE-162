@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion as Motion } from 'framer-motion';
-import { CalendarDays, Clock, MapPin, Users, Pencil, Trash2, XCircle } from 'lucide-react';
+import { CalendarDays, Clock, MapPin, Users, Pencil, Trash2, XCircle, RefreshCw } from 'lucide-react';
 import BookingStatusBadge from './BookingStatusBadge';
 
 const resourceTypeIcon = {
@@ -90,6 +90,15 @@ export default function BookingCard({ booking, onCancel, onDelete, index = 0 }) 
           >
             <XCircle size={12} />
             Cancel
+          </button>
+        )}
+        {(booking.status === 'REJECTED' || booking.status === 'CANCELLED') && (
+          <button
+            onClick={() => navigate(`/bookings/new?rebook=${booking.id}`)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg text-violet-600 bg-violet-50 hover:bg-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Rebook
           </button>
         )}
         {(booking.status === 'PENDING' || booking.status === 'CANCELLED') && onDelete && (
