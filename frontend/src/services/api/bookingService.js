@@ -31,6 +31,10 @@ const bookingService = {
 
   // DELETE /api/v1/bookings/:id
   deleteBooking: (id) => api.delete(`${BASE}/${id}`),
+
+  // GET /api/v1/bookings/resource-schedule?resourceId=...&date=...
+  getResourceSchedule: (resourceId, date) =>
+    api.get(`${BASE}/resource-schedule`, { params: { resourceId, date } }),
 };
 
 export default bookingService;

@@ -41,15 +41,12 @@ export default function BookingDetail() {
       .then(async (res) => {
         const b = res.data?.data ?? res.data;
         setBooking(b);
-        // Load sibling bookings for timeline — admin sees all, user sees own
+        // Load approved bookings for the same resource+date to render the timeline
         try {
-          const sibRes = await bookingService.getAllBookings({
-            resourceId: b.resourceId,
-            date: b.date,
-          });
+          const sibRes = await bookingService.getResourceSchedule(b.resourceId, b.date);
           setSameResourceBookings(sibRes.data?.data ?? []);
         } catch {
-          // Non-admin users will receive 403 — silently skip the timeline
+          // Silently skip timeline if the schedule endpoint fails
         }
       })
       .catch(() => navigate('/bookings'))
