@@ -66,8 +66,10 @@ const Signup = () => {
         password: formData.password
       });
 
-      setSuccessMsg("Verification code sent to your email!");
-      setVerificationMode(true);
+      setSuccessMsg("Registration successful! Redirecting to verification...");
+      setTimeout(() => {
+        navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+      }, 1500);
     } catch (err) {
       if (!err.response) {
         setError("Unable to connect to the server. Please check if the backend is running.");
@@ -79,27 +81,6 @@ const Signup = () => {
     }
   };
 
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    if (verificationCode.length !== 6) {
-      setError("Please enter the 6-digit code.");
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-    try {
-      await authService.verifyEmail(formData.email, verificationCode);
-      setSuccessMsg("Email verified! Redirecting to login...");
-      setTimeout(() => {
-        navigate('/', { replace: true });
-      }, 2000);
-    } catch (err) {
-      setError(typeof err.response?.data === 'string' ? err.response.data : "Verification failed. Please check the code.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="min-h-dvh flex bg-gradient-to-br from-zinc-50 via-violet-50/90 to-fuchsia-100/80 font-sans text-zinc-800 antialiased dark:from-zinc-950 dark:via-violet-950/30 dark:to-zinc-950 dark:text-zinc-100">

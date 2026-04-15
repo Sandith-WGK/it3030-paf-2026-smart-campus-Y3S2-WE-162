@@ -8,11 +8,40 @@ import AdminDashboard from './pages/AdminDashboard';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import Profile from './pages/Profile';
+import VerifyEmail from './pages/VerifyEmail';
 
-// A simple wrapper for private routes
+// A wrapper for private routes that handles the loading state
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
   return isAuthenticated ? children : <Navigate to="/" replace />;
+};
+
+// A wrapper for admin-only routes
+const AdminRoute = ({ children }) => {
+  const { user, isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
+  if (!isAuthenticated) return <Navigate to="/" replace />;
+  if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  
+  return children;
 };
 
 function App() {
@@ -36,11 +65,20 @@ function App() {
       <Route 
         path="/admin/users" 
         element={
-          <PrivateRoute>
+          <AdminRoute>
             <AdminDashboard />
+          </AdminRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <PrivateRoute>
+            <Profile />
           </PrivateRoute>
         } 
       />
+      <Route path="/verify-email" element={<VerifyEmail />} />
       
       {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -63,8 +63,8 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     }
 
     private User updateExistingUser(User existingUser, OAuth2User oAuth2User) {
-        existingUser.setName(oAuth2User.getAttribute("name"));
-        existingUser.setPicture(oAuth2User.getAttribute("picture"));
+        // We stop overwriting name and picture here to respect user changes made in our app.
+        // If we ever add lastLogin fields, they would go here.
         return userRepository.save(existingUser);
     }
 }

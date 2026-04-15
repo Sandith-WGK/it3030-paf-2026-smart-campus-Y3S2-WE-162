@@ -4,27 +4,44 @@ import com.smartcampus.model.Role;
 import com.smartcampus.model.User;
 import com.smartcampus.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class UserService {
 
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
 
     @Autowired
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, EmailService emailService) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
     public List<User> getAllUsers() {
         return userRepository.findAll();
     }
 
+    public User getUserById(String id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + id));
+    }
+
     public User createUser(String email, String name, Role role) {
+        // Prevent duplicates
+        if (userRepository.existsByEmail(email)) {
+             throw new RuntimeException("User already exists with email: " + email);
+        }
+
         // Stub user without passport/password since we use Google OAuth
         User user = User.builder()
                 .email(email)
@@ -36,11 +53,55 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    public User updateUserRole(String id, Role role) {
+    public User updateUser(String id, String email, String name, Role role, String password, String picture) {
         Optional<User> userOpt = userRepository.findById(id);
         if (userOpt.isPresent()) {
             User user = userOpt.get();
-            user.setRole(role);
+            boolean isLocalProvider = "LOCAL".equalsIgnoreCase(user.getProvider());
+            
+            // Re-verification logic if email changes
+            if (StringUtils.hasText(email) && !email.equalsIgnoreCase(user.getEmail())) {
+                System.out.println("DEBUG: Email change attempted. Old: " + user.getEmail() + " New: " + email);
+                // Policy: Only LOCAL users can change their email. Google identities are fixed.
+                if (!isLocalProvider) {
+                    System.out.println("DEBUG: Rejecting email change for non-local provider: " + user.getProvider());
+                    throw new RuntimeException("Email addresses for Google-linked accounts cannot be modified here.");
+                }
+                
+                user.setEmail(email);
+                user.setEnabled(false);
+                // Standardize on 6-digit numeric verification code
+                String verificationCode = String.valueOf((int)((Math.random() * 900000) + 100000));
+                user.setVerificationCode(verificationCode);
+                
+                // Trigger the actual email sending
+                try {
+                    emailService.sendVerificationEmail(email, verificationCode);
+                } catch (Exception e) {
+                    System.err.println("Failed to send verification email during profile update: " + e.getMessage());
+                }
+            }
+            
+            if (StringUtils.hasText(name)) user.setName(name);
+            
+            // Role can be changed for both LOCAL and GOOGLE users
+            if (role != null) {
+                user.setRole(role);
+            }
+            
+            // Handle Profile Picture
+            if (StringUtils.hasText(picture)) {
+                user.setPicture(picture);
+            }
+            
+            // Handle Password Update
+            if (StringUtils.hasText(password)) {
+                if (!isLocalProvider) {
+                    throw new RuntimeException("Passwords cannot be set for Google-linked accounts.");
+                }
+                user.setPassword(passwordEncoder.encode(password));
+            }
+            
             return userRepository.save(user);
         }
         throw new RuntimeException("User not found with id: " + id);

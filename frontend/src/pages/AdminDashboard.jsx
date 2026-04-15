@@ -9,13 +9,14 @@ import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend
 } from 'recharts';
 import { 
-  Moon, Sun, Search, FileDown, Plus, Edit2, Trash2, X, Brain, CheckCircle
+  Moon, Sun, Search, FileDown, Plus, Edit2, Trash2, X, Brain, CheckCircle, Camera, Lock
 } from 'lucide-react';
+import Navbar from '../components/Navbar';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981'];
 
 export default function AdminDashboard() {
-  const { logout } = useAuth();
+  const { logout, user, login, updateUserLocal } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +30,8 @@ export default function AdminDashboard() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [newUserData, setNewUserData] = useState({ email: '', name: '', role: 'USER' });
+  const editingProvider = (editingUser?.provider || '').toUpperCase();
+  const isEditingLocalUser = editingProvider === 'LOCAL';
 
   useEffect(() => {
     fetchUsers();
@@ -43,9 +46,15 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       const data = await userService.getAllUsers();
-      setUsers(data);
+      if (data && Array.isArray(data)) {
+        setUsers(data);
+      } else {
+        console.error('API did not return a user array:', data);
+        setUsers([]);
+      }
     } catch (err) {
       console.error('Failed to fetch users', err);
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -83,9 +92,61 @@ export default function AdminDashboard() {
 
   const handleEditSubmit = async (e) => {
     e.preventDefault();
-    await userService.updateUserRole(editingUser.id, editingUser.role);
-    setIsEditModalOpen(false);
-    fetchUsers();
+    try {
+      const updatePayload = {
+        name: editingUser.name,
+        role: editingUser.role,
+        picture: editingUser.picture
+      };
+
+      if (isEditingLocalUser) {
+        updatePayload.email = editingUser.email;
+        if (editingUser.password) {
+          updatePayload.password = editingUser.password;
+        }
+      }
+
+      const response = await userService.updateUser(editingUser.id, updatePayload);
+      
+      const currentUserId = user?.userId || user?.sub || user?.id;
+      if (currentUserId && editingUser.id === currentUserId) {
+        if (response && response.token) {
+          login(response.token, response.user);
+        } else {
+          updateUserLocal({
+            name: editingUser.name,
+            email: editingUser.email,
+            role: editingUser.role,
+            picture: editingUser.picture
+          });
+        }
+      }
+
+      setIsEditModalOpen(false);
+      fetchUsers();
+    } catch (err) {
+      console.error('Update failed:', err);
+      alert('Failed to update user. Email might already be taken.');
+    }
+  };
+
+  const handleImageUpload = (e, target) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1024 * 1024) { // 1MB limit for Base64 efficiency
+        alert("Image is too large. Please select an image under 1MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (target === 'new') {
+          setNewUserData({...newUserData, picture: reader.result});
+        } else {
+          setEditingUser({...editingUser, picture: reader.result});
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const exportToPDF = async () => {
@@ -227,7 +288,9 @@ export default function AdminDashboard() {
 
   // Derived state
   const filteredUsers = useMemo(() => {
+    if (!users || !Array.isArray(users)) return [];
     return users.filter(user => {
+      if (!user) return false;
       const matchRole = roleFilter === 'ALL' || user.role === roleFilter;
       const matchSearch = (user.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || 
                           (user.email?.toLowerCase() || '').includes(searchTerm.toLowerCase());
@@ -236,7 +299,9 @@ export default function AdminDashboard() {
   }, [users, searchTerm, roleFilter]);
 
   const roleDistribution = useMemo(() => {
+    if (!users || !Array.isArray(users)) return [];
     const dist = users.reduce((acc, user) => {
+      if (!user || !user.role) return acc;
       acc[user.role] = (acc[user.role] || 0) + 1;
       return acc;
     }, {});
@@ -244,19 +309,20 @@ export default function AdminDashboard() {
   }, [users]);
 
   const registrationsByDate = useMemo(() => {
+    if (!users || !Array.isArray(users)) return [];
     const dist = users.reduce((acc, user) => {
-      if(!user.createdAt) return acc;
+      if(!user || !user.createdAt) return acc;
       const date = new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       acc[date] = (acc[date] || 0) + 1;
       return acc;
     }, {});
-    return Object.keys(dist).map(key => ({ date: key, count: dist[key] })).slice(-7); // Last 7 unique days
+    return Object.keys(dist).map(key => ({ date: key, count: dist[key] })).slice(-7); 
   }, [users]);
 
   const generateAIAssessment = () => {
-    if (users.length === 0) return "Gathering data...";
-    const admins = users.filter(u => u.role === 'ADMIN').length;
-    const techs = users.filter(u => u.role === 'TECHNICIAN').length;
+    if (!users || !Array.isArray(users) || users.length === 0) return "Gathering data...";
+    const admins = users.filter(u => u && u.role === 'ADMIN').length;
+    const techs = users.filter(u => u && u.role === 'TECHNICIAN').length;
     
     if (admins > users.length / 2) return "⚠️ High number of Admins. Consider reviewing access controls.";
     if (techs === 0) return "💡 You have no Technicians. Operations may stall.";
@@ -266,23 +332,7 @@ export default function AdminDashboard() {
   return (
     <div className={`min-h-dvh transition-colors duration-300 w-full font-sans antialiased flex flex-col ${darkMode ? 'bg-zinc-950 text-zinc-100' : 'bg-zinc-50 text-zinc-900'}`}>
       
-      {/* Header */}
-      <header className="px-8 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-10 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
-            <span className="text-white font-bold text-sm">SC</span>
-          </div>
-          <h1 className="font-bold text-xl tracking-tight">Admin<span className="text-violet-600 dark:text-violet-400">Sphere</span></h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors">
-            {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <button onClick={handleLogout} className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white px-4 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 transition-colors">
-            Sign Out
-          </button>
-        </div>
-      </header>
+      <Navbar />
 
       <main className="flex-1 p-8 max-w-7xl mx-auto w-full space-y-8">
         
@@ -508,25 +558,87 @@ export default function AdminDashboard() {
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm shadow-2xl">
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl overflow-hidden border border-zinc-200 dark:border-zinc-800">
               <div className="flex justify-between items-center p-6 border-b border-zinc-200 dark:border-zinc-800">
-                <h3 className="font-semibold text-lg">Edit User Role</h3>
+                <h3 className="font-semibold text-lg text-zinc-900 dark:text-zinc-100">Edit User Details</h3>
                 <button onClick={() => setIsEditModalOpen(false)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"><X size={20} /></button>
               </div>
-              <form onSubmit={handleEditSubmit} className="p-6 space-y-4">
-                <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-xl mb-4">
-                  <p className="text-sm font-medium">{editingUser?.name || 'Unnamed'}</p>
-                  <p className="text-xs text-zinc-500">{editingUser?.email}</p>
+              <form onSubmit={handleEditSubmit} className="p-6 space-y-5 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                
+                {/* Profile Picture Upload */}
+                <div className="flex flex-col items-center gap-4 mb-2">
+                  <div className="relative group">
+                    <img 
+                      src={editingUser?.picture || `https://ui-avatars.com/api/?name=${editingUser?.name || editingUser?.email}&background=random`} 
+                      className="w-24 h-24 rounded-full object-cover border-4 border-violet-100 dark:border-violet-900/30 shadow-lg group-hover:opacity-75 transition-all"
+                    />
+                    <label className="absolute inset-0 flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 rounded-full">
+                      <Camera className="text-white" size={24} />
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleImageUpload(e, 'edit')} />
+                    </label>
+                  </div>
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-400 font-bold">Change Profile Photo</p>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Update Role</label>
-                  <select value={editingUser?.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700">
-                    <option value="USER">User</option>
-                    <option value="TECHNICIAN">Technician</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Full Name</label>
+                    <input 
+                      required 
+                      type="text" 
+                      value={editingUser?.name || ''} 
+                      onChange={e => setEditingUser({...editingUser, name: e.target.value})} 
+                      className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm" 
+                    />
+                  </div>
+                  
+                  <div className="col-span-2">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Email Address</label>
+                    <input 
+                      required 
+                      type="email" 
+                      value={editingUser?.email || ''} 
+                      disabled={!isEditingLocalUser}
+                      onChange={e => setEditingUser({...editingUser, email: e.target.value})} 
+                      className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                    />
+                    {!isEditingLocalUser && (
+                      <p className="text-[10px] text-violet-500 mt-2">Google account: email is locked.</p>
+                    )}
+                  </div>
+
+                  <div className="col-span-1">
+                    <label className="block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">Role</label>
+                    <select 
+                      value={editingUser?.role || 'USER'} 
+                      onChange={e => setEditingUser({...editingUser, role: e.target.value})} 
+                      className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm"
+                    >
+                      <option value="USER">User</option>
+                      <option value="TECHNICIAN">Technician</option>
+                      <option value="ADMIN">Admin</option>
+                    </select>
+                  </div>
+
+                  <div className="col-span-1">
+                    <label className="flex items-center gap-1 block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
+                      <Lock size={12} /> New Password
+                    </label>
+                    <input 
+                      type="password" 
+                      placeholder="••••••••"
+                      value={editingUser?.password || ''} 
+                      disabled={!isEditingLocalUser}
+                      onChange={e => setEditingUser({...editingUser, password: e.target.value})} 
+                      className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                    />
+                    {!isEditingLocalUser && (
+                      <p className="text-[10px] text-violet-500 mt-2">Google account: password cannot be changed here.</p>
+                    )}
+                  </div>
                 </div>
-                <div className="pt-4 flex justify-end gap-3">
-                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors">Cancel</button>
-                  <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-colors">Save Changes</button>
+
+                <div className="pt-2 flex justify-end gap-3 border-t border-zinc-100 dark:border-zinc-800 mt-2">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2 text-sm font-medium rounded-xl text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800 transition-all">Cancel</button>
+                  <button type="submit" className="px-6 py-2 text-sm font-medium text-white bg-violet-600 rounded-xl hover:bg-violet-700 transition-all shadow-md shadow-violet-600/20 active:scale-95">Save Profile</button>
                 </div>
               </form>
             </motion.div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Navbar from '../components/Navbar';
 
 const Dashboard = () => {
   const { logout } = useAuth();
@@ -13,15 +14,7 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-dvh w-full bg-zinc-50 font-sans text-zinc-800 antialiased dark:bg-zinc-950 dark:text-zinc-100 flex flex-col">
-      <header className="px-6 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-between">
-        <h1 className="font-bold text-xl tracking-tight text-violet-600 dark:text-violet-400">Smart Campus HUB</h1>
-        <button 
-          onClick={handleLogout}
-          className="text-sm font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white px-3 py-1.5 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-        >
-          Sign Out
-        </button>
-      </header>
+      <Navbar />
       
       <main className="flex-1 p-8 max-w-7xl mx-auto w-full">
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
