@@ -74,36 +74,24 @@ public class AuthController {
         
         if(userRepository.existsByEmail(email)) {
             User existingUser = userRepository.findByEmail(email).orElse(null);
-            if(existingUser != null && existingUser.isEnabled()) {
-                return ResponseEntity.badRequest().body("Error: Email is already registered and verified.");
+            if(existingUser != null) {
+                return ResponseEntity.badRequest().body("Error: Email is already registered.");
             }
-            // If user exists but is NOT enabled, we'll allow them to "re-register" (update code)
         }
 
-        // Generate 6-digit verification code
-        String verificationCode = String.valueOf((int)((Math.random() * 900000) + 100000));
-
-        // Create or update user account (disabled by default)
-        User user = userRepository.findByEmail(email).orElse(new User());
+        // Create user account and allow immediate login (no email verification gate)
+        User user = new User();
         user.setName(signupRequest.getName());
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
         user.setProvider("LOCAL");
         user.setRole(Role.USER);
-        user.setEnabled(false);
-        user.setVerificationCode(verificationCode);
+        user.setEnabled(true);
+        user.setVerificationCode(null);
 
         userRepository.save(user);
-
-        // Send verification email
-        try {
-            emailService.sendVerificationEmail(user.getEmail(), verificationCode);
-        } catch (Exception e) {
-            // Log the error but keep the user record (they can request resend later)
-            System.err.println("Failed to send verification email: " + e.getMessage());
-        }
         
-        return ResponseEntity.ok("Registration successful. Please check your email for verification code.");
+        return ResponseEntity.ok("Registration successful. You can now log in.");
     }
 
     @PostMapping("/verify")

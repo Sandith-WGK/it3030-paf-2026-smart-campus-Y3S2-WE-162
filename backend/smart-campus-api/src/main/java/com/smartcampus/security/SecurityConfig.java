@@ -35,6 +35,9 @@ public class SecurityConfig {
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Autowired
+    private HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+
+    @Autowired(required = false)
     private ClientRegistrationRepository clientRegistrationRepository;
 
     @Bean
@@ -42,15 +45,19 @@ public class SecurityConfig {
         http
             .cors(cors -> cors.configure(http))
             .csrf(csrf -> csrf.disable()) // Stateless REST API
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
             .authorizeHttpRequests(authz -> authz
                 .requestMatchers("/api/v1/auth/**", "/oauth2/**", "/login/**", "/error").permitAll()
                 .anyRequest().authenticated()
             )
-            .oauth2Login(oauth2 -> oauth2
+            ;
+
+        if (clientRegistrationRepository != null) {
+            http.oauth2Login(oauth2 -> oauth2
                 .authorizationEndpoint(authEndpoint -> authEndpoint
                     .baseUri("/oauth2/authorize")
-                    .authorizationRequestResolver(googleAccountPickerResolver())
+                    .authorizationRequestRepository(httpCookieOAuth2AuthorizationRequestRepository)
+                    .authorizationRequestResolver(googleAccountPickerResolver(clientRegistrationRepository))
                 )
                 .userInfoEndpoint(userInfoEndpoint -> userInfoEndpoint
                     .userService(customOAuth2UserService)
@@ -58,6 +65,7 @@ public class SecurityConfig {
                 .successHandler(oAuth2AuthenticationSuccessHandler)
                 .failureHandler(oAuth2AuthenticationFailureHandler)
             );
+        }
 
         // Add our custom Token based authentication filter
         http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -80,8 +88,8 @@ public class SecurityConfig {
      * already has an active Google session. This lets users switch accounts
      * after signing out without needing to clear browser cookies.
      */
-    @Bean
-    public OAuth2AuthorizationRequestResolver googleAccountPickerResolver() {
+    private OAuth2AuthorizationRequestResolver googleAccountPickerResolver(
+            ClientRegistrationRepository clientRegistrationRepository) {
         DefaultOAuth2AuthorizationRequestResolver resolver =
                 new DefaultOAuth2AuthorizationRequestResolver(
                         clientRegistrationRepository, "/oauth2/authorize");

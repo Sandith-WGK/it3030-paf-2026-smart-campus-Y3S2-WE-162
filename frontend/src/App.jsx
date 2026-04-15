@@ -9,6 +9,8 @@ import AdminDashboard from './pages/AdminDashboard';
 import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import Profile from './pages/Profile';
+import VerifyEmail from './pages/VerifyEmail';
 
 // Booking pages
 import MyBookings from './pages/bookings/MyBookings';
@@ -25,15 +27,34 @@ import AdminResources from './pages/resources/AdminResources';
 
 // Wrapper for any authenticated route
 const PrivateRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
   return isAuthenticated ? children : <Navigate to="/" replace />;
 };
 
-// Wrapper for admin-only routes
+// A wrapper for admin-only routes
 const AdminRoute = ({ children }) => {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-dvh flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="w-10 h-10 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+  
   if (!isAuthenticated) return <Navigate to="/" replace />;
-  if (!isAdmin()) return <Navigate to="/dashboard" replace />;
+  if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  
   return children;
 };
 
@@ -46,9 +67,11 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
-
-      {/* Protected routes */}
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      
+      {/* Protected routes (USER) */}
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+      <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
 
       {/* Booking routes (USER + ADMIN) */}
       <Route path="/bookings" element={<PrivateRoute><MyBookings /></PrivateRoute>} />

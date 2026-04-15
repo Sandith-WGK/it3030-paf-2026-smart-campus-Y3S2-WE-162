@@ -1,5 +1,6 @@
 package com.smartcampus.security;
 
+import com.smartcampus.model.User;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -21,7 +22,15 @@ public class JwtProvider {
 
     public String generateToken(Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
+        return generateTokenFromPrincipal(userPrincipal);
+    }
 
+    public String generateTokenFromUser(User user) {
+        UserPrincipal userPrincipal = UserPrincipal.create(user);
+        return generateTokenFromPrincipal(userPrincipal);
+    }
+
+    private String generateTokenFromPrincipal(UserPrincipal userPrincipal) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationInMs);
 
@@ -31,9 +40,19 @@ public class JwtProvider {
                 .map(a -> a.getAuthority().replace("ROLE_", ""))
                 .orElse("USER");
 
+        String pictureUrl = userPrincipal.getPicture();
+        // Prevent huge base64 profiles from blowing up the JWT and crashing Tomcat Headers
+        if (pictureUrl != null && pictureUrl.length() > 2000) {
+            pictureUrl = ""; 
+        }
+
         return Jwts.builder()
-                .subject(userPrincipal.getId())
+                .subject(userPrincipal.getUserId())
+                .claim("email", userPrincipal.getEmail())
                 .claim("role", role)
+                .claim("name", userPrincipal.getName())
+                .claim("provider", userPrincipal.getProvider())
+                .claim("picture", pictureUrl)
                 .issuedAt(new Date())
                 .expiration(expiryDate)
                 .signWith(getSignInKey())

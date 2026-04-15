@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -30,6 +31,7 @@ public class User {
 
     private String provider; // "GOOGLE" or "LOCAL"
 
+    @JsonIgnore
     private String password; // Hashed password for local auth
 
     @Builder.Default
@@ -38,9 +40,13 @@ public class User {
     @Builder.Default
     private boolean enabled = false; // user must verify email to be enabled
 
+    @JsonIgnore
     private String verificationCode;
 
+    @JsonIgnore
     private String resetCode;
+
+    @JsonIgnore
     private Instant resetCodeExpiresAt;
 
     @CreatedDate

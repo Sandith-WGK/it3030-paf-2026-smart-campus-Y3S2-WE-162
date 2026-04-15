@@ -12,8 +12,15 @@ export const authService = {
   },
 
   verifyEmail: async (email, code) => {
-    const response = await axios.post('/auth/verify', { email, code });
-    return response.data;
+    console.log(`API Call: Verifying ${email} with code ${code}`);
+    try {
+      const response = await axios.post('/auth/verify', { email, code });
+      console.log('API Success:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('API Error:', error.response?.data || error.message);
+      throw error;
+    }
   },
 
   forgotPassword: async (email) => {

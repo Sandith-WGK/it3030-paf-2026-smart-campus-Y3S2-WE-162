@@ -5,6 +5,9 @@ import com.smartcampus.model.User;
 import com.smartcampus.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -21,8 +24,15 @@ public class UserController {
     }
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == principal.userId")
+    public ResponseEntity<User> getUserById(@PathVariable String id) {
+        return ResponseEntity.ok(userService.getUserById(id));
     }
 
     public record CreateUserRequest(String email, String name, Role role) {}
@@ -33,15 +43,26 @@ public class UserController {
         return ResponseEntity.ok(created);
     }
 
-    public record UpdateRoleRequest(Role role) {}
+    public record UpdateUserRequest(String email, String name, Role role, String password, String picture) {}
+    public record AuthResponse(String token, User user) {}
 
-    @PutMapping("/{id}/role")
-    public ResponseEntity<User> updateUserRole(@PathVariable String id, @RequestBody UpdateRoleRequest request) {
-        User updated = userService.updateUserRole(id, request.role());
-        return ResponseEntity.ok(updated);
+    @Autowired
+    private com.smartcampus.security.JwtProvider jwtProvider;
+    
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN') or #id == principal.userId")
+    public ResponseEntity<AuthResponse> updateUser(@PathVariable String id, @RequestBody UpdateUserRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream().anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        Role effectiveRole = isAdmin ? request.role() : null;
+
+        User updated = userService.updateUser(id, request.email(), request.name(), effectiveRole, request.password(), request.picture());
+        String newToken = jwtProvider.generateTokenFromUser(updated);
+        return ResponseEntity.ok(new AuthResponse(newToken, updated));
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {
         userService.deleteUser(id);
         return ResponseEntity.noContent().build();

@@ -1,23 +1,85 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { userService } from '../services/api/userService';
 import { isAuthenticated as checkTokenValid } from '../utils/auth';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(() => checkTokenValid());
+
+  const isValidPictureSrc = (value) => {
+    if (!value || typeof value !== 'string') return false;
+    return (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:image/')
+    );
+  };
+
+  // Helper to decode JWT payload
+  const decodeToken = (token) => {
+    try {
+      const payloadBase64Url = token.split('.')[1];
+      const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payloadBase64.padEnd(payloadBase64.length + (4 - (payloadBase64.length % 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded));
+      return payload;
+    } catch (e) {
+      return null;
+    }
+  };
 
   useEffect(() => {
     if (token) {
       localStorage.setItem('token', token);
-      setIsAuthenticated(checkTokenValid());
+      const decodedUser = decodeToken(token);
+      
+      if (decodedUser) {
+        // Recover large base64 picture from local cache since backend JWT omits it to save header size
+        const savedPic = localStorage.getItem('user_pic');
+        if (!isValidPictureSrc(decodedUser.picture) && isValidPictureSrc(savedPic)) {
+          decodedUser.picture = savedPic;
+        } else if (isValidPictureSrc(decodedUser.picture)) {
+          localStorage.setItem('user_pic', decodedUser.picture);
+        } else if (decodedUser.picture && !isValidPictureSrc(decodedUser.picture)) {
+          // Ignore invalid non-url values (prevents broken <img> src like "profile")
+          decodedUser.picture = '';
+        }
+        setUser(decodedUser);
+        setIsAuthenticated(true);
+
+        // If key fields are missing from token (common after relogin for big picture),
+        // fetch the full user record once and merge it.
+        if (!isValidPictureSrc(decodedUser.picture) || !decodedUser.provider) {
+          const id = decodedUser.userId || decodedUser.sub || decodedUser.id;
+          if (id) {
+            (async () => {
+              try {
+                const freshUser = await userService.getUserById(id);
+                if (isValidPictureSrc(freshUser?.picture)) localStorage.setItem('user_pic', freshUser.picture);
+                setUser(prev => ({ ...prev, ...freshUser }));
+              } catch (e) {
+                // Non-fatal: profile will fall back to avatar placeholder
+              }
+            })();
+          }
+        }
+      } else {
+        setIsAuthenticated(false);
+      }
     } else {
       localStorage.removeItem('token');
+      localStorage.removeItem('user_pic');
+      setUser(null);
       setIsAuthenticated(false);
     }
+    setLoading(false);
   }, [token]);
 
-  // Auto-logout when token expires mid-session (checked every 60 seconds)
+  // Auto-Logout when token expires mid-session (checked every 60 seconds)
   useEffect(() => {
     if (!token) return;
     const interval = setInterval(() => {
@@ -28,16 +90,36 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(interval);
   }, [token]);
 
-  const login = (newToken) => {
-    setToken(newToken);
-  };
+  const login = useCallback((newToken, userData = null) => {
+    localStorage.setItem('token', newToken);
+    
+    // 1. Start with values from the decoded token
+    let mergedUser = decodeToken(newToken);
+    
+    // 2. If literal user data was provided (from an API response), prefer its values
+    // especially for large fields like 'picture' which are omitted from the JWT header
+    if (userData && mergedUser) {
+      mergedUser = { ...mergedUser, ...userData };
+    }
 
-  const logout = () => {
+    if (mergedUser) {
+      if (isValidPictureSrc(mergedUser.picture)) {
+        localStorage.setItem('user_pic', mergedUser.picture);
+      } else {
+        const savedPic = localStorage.getItem('user_pic');
+        if (isValidPictureSrc(savedPic)) mergedUser.picture = savedPic;
+      }
+    }
+    
+    setToken(newToken);
+  }, []);
+
+  const logout = useCallback(() => {
     setToken(null);
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ token, isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthenticated, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );
