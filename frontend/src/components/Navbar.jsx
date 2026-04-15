@@ -6,7 +6,7 @@ import {
   LogOut, User as UserIcon, Settings, ChevronDown, Bell, Moon, Sun
 } from 'lucide-react';
 
-const Navbar = () => {
+const Navbar = ({ leftSlot = null }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -30,6 +30,7 @@ const Navbar = () => {
   return (
     <header className="px-8 py-4 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-50 flex items-center justify-between">
       <div className="flex items-center gap-3">
+        {leftSlot}
         <Link to={user?.role === 'ADMIN' ? '/admin/users' : '/dashboard'} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center">
             <span className="text-white font-bold text-sm">SC</span>

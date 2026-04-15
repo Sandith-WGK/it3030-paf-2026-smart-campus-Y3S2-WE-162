@@ -34,7 +34,14 @@ const Login = () => {
         navigate('/dashboard', { replace: true });
       }
     } catch (err) {
-      setError(err.response?.data || "Authentication failed. Please check your credentials.");
+      const payload = err.response?.data;
+      const message =
+        (typeof payload === 'string' && payload) ||
+        payload?.message ||
+        payload?.error ||
+        err.message ||
+        "Authentication failed. Please check your credentials.";
+      setError(message);
     } finally {
       setIsLoading(false);
     }

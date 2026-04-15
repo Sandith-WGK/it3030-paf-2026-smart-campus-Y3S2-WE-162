@@ -1,7 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import Navbar from '../components/Navbar';
 import { motion as Motion } from 'framer-motion';
 import { CalendarDays, Wrench, Bell, LayoutGrid } from 'lucide-react';
 import Layout from '../components/layout/Layout';

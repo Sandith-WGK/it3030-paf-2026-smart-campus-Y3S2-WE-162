@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Camera, CheckCircle, Mail, User as UserIcon, Lock, ShieldCheck, AlertCircle, Save
+  Camera, CheckCircle, Mail, User as UserIcon, Lock, ShieldCheck, AlertCircle, Save, Eye, EyeOff
 } from 'lucide-react';
 import { userService } from '../services/api/userService';
 
@@ -14,8 +14,11 @@ const Profile = () => {
   const isLocalUser = provider === 'LOCAL';
   const isGoogleUser = provider === 'GOOGLE';
   const canEditNameAndPicture = isLocalUser || isGoogleUser;
+  const canEditRole = false; // Role changes are managed by admins (use Admin panel)
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -96,7 +99,6 @@ const Profile = () => {
       setLoading(true);
       const updatePayload = {
         name: formData.name,
-        role: formData.role,
         picture: formData.picture,
       };
       
@@ -239,19 +241,6 @@ const Profile = () => {
                     </p>
                   ) : null}
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 px-1">Role</label>
-                  <select
-                    value={formData.role}
-                    disabled={!canEditNameAndPicture}
-                    onChange={(e) => setFormData({...formData, role: e.target.value})}
-                    className="w-full p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-violet-500 outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="USER">User</option>
-                    <option value="TECHNICIAN">Technician</option>
-                    <option value="ADMIN">Admin</option>
-                  </select>
-                </div>
               </div>
               {isGoogleUser && (
                 <div className="mt-4">
@@ -273,23 +262,47 @@ const Profile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                   <div>
                     <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 px-1">New Password</label>
-                    <input 
-                      type="password" 
+                    <div className="relative">
+                      <input 
+                        type={showPassword ? "text" : "password"}
                       placeholder="Leave blank to keep current"
                       value={formData.password}
                       onChange={(e) => setFormData({...formData, password: e.target.value})}
-                      className="w-full p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-violet-500 outline-none transition-all"
-                    />
+                        className="w-full p-3.5 pr-11 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-violet-500 outline-none transition-all"
+                      />
+                      {formData.password?.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-4 text-zinc-400 hover:text-violet-500 transition-colors"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-zinc-400 uppercase tracking-widest mb-2 px-1">Confirm Password</label>
-                    <input 
-                      type="password" 
+                    <div className="relative">
+                      <input 
+                        type={showConfirmPassword ? "text" : "password"}
                       placeholder="Verify new password"
                       value={formData.confirmPassword}
                       onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
-                      className="w-full p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-violet-500 outline-none transition-all"
-                    />
+                        className="w-full p-3.5 pr-11 rounded-2xl bg-zinc-50 dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 focus:ring-2 focus:ring-violet-500 outline-none transition-all"
+                      />
+                      {formData.confirmPassword?.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(v => !v)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-4 text-zinc-400 hover:text-violet-500 transition-colors"
+                          aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                        >
+                          {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 

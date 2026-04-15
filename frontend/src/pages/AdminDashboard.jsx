@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { 
   Moon, Sun, Search, FileDown, Plus, Edit2, Trash2, X, Brain, CheckCircle, Camera, Lock
+  , Eye, EyeOff
 } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
@@ -24,6 +25,7 @@ export default function AdminDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('ALL');
   const [isExporting, setIsExporting] = useState(false);
+  const [showEditPassword, setShowEditPassword] = useState(false);
   
   // Modals state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -123,6 +125,7 @@ export default function AdminDashboard() {
       }
 
       setIsEditModalOpen(false);
+      setShowEditPassword(false);
       fetchUsers();
     } catch (err) {
       console.error('Update failed:', err);
@@ -497,7 +500,15 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => { setEditingUser(user); setIsEditModalOpen(true); }} className="p-2 text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-lg transition-colors">
+                          <button
+                            onClick={() => {
+                              // Never prefill password (DB contains hashed value for LOCAL users)
+                              setEditingUser({ ...user, password: '' });
+                              setShowEditPassword(false);
+                              setIsEditModalOpen(true);
+                            }}
+                            className="p-2 text-zinc-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-lg transition-colors"
+                          >
                             <Edit2 size={16} />
                           </button>
                           <button onClick={() => handleDelete(user.id)} className="p-2 text-zinc-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10 dark:hover:text-red-400 rounded-lg transition-colors">
@@ -622,14 +633,27 @@ export default function AdminDashboard() {
                     <label className="flex items-center gap-1 block text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1.5">
                       <Lock size={12} /> New Password
                     </label>
-                    <input 
-                      type="password" 
-                      placeholder="••••••••"
-                      value={editingUser?.password || ''} 
-                      disabled={!isEditingLocalUser}
-                      onChange={e => setEditingUser({...editingUser, password: e.target.value})} 
-                      className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
-                    />
+                    <div className="relative">
+                      <input 
+                        type={showEditPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={editingUser?.password || ''} 
+                        disabled={!isEditingLocalUser}
+                        onChange={e => setEditingUser({...editingUser, password: e.target.value})} 
+                        className="w-full p-3 pr-11 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm disabled:opacity-50 disabled:cursor-not-allowed" 
+                      />
+                      {(editingUser?.password || '').length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowEditPassword(v => !v)}
+                          className="absolute inset-y-0 right-0 flex items-center pr-3 text-zinc-400 hover:text-violet-500 transition-colors disabled:opacity-40"
+                          disabled={!isEditingLocalUser}
+                          aria-label={showEditPassword ? "Hide password" : "Show password"}
+                        >
+                          {showEditPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      )}
+                    </div>
                     {!isEditingLocalUser && (
                       <p className="text-[10px] text-violet-500 mt-2">Google account: password cannot be changed here.</p>
                     )}

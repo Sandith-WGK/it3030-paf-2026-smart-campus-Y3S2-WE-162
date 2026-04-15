@@ -63,8 +63,27 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
     }
 
     private User updateExistingUser(User existingUser, OAuth2User oAuth2User) {
-        // We stop overwriting name and picture here to respect user changes made in our app.
-        // If we ever add lastLogin fields, they would go here.
+        // Respect user edits made in our app; only fill missing values from Google.
+        String oauthName = oAuth2User.getAttribute("name");
+        if (!StringUtils.hasText(existingUser.getName()) && StringUtils.hasText(oauthName)) {
+            existingUser.setName(oauthName);
+        }
+
+        String oauthPicture = oAuth2User.getAttribute("picture");
+        if (StringUtils.hasText(oauthPicture)) {
+            String currentPicture = existingUser.getPicture();
+            boolean hasRealPicture =
+                    StringUtils.hasText(currentPicture) &&
+                    (currentPicture.startsWith("http://")
+                            || currentPicture.startsWith("https://")
+                            || currentPicture.startsWith("data:"));
+
+            // For Google-linked accounts, prefer the provider photo unless the user already has a real picture stored.
+            if (!hasRealPicture) {
+                existingUser.setPicture(oauthPicture);
+            }
+        }
+
         return userRepository.save(existingUser);
     }
 }

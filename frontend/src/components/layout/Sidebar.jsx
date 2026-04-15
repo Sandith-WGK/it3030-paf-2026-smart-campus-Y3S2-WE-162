@@ -7,7 +7,6 @@ import {
   CalendarDays,
   PlusSquare,
   ClipboardList,
-  LogOut,
   X,
 } from 'lucide-react';
 
@@ -17,49 +16,45 @@ const inactiveClass =
   'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100';
 
 export default function Sidebar({ open, onClose }) {
-  const { logout } = useAuth();
-  const navigate = useNavigate();
   const admin = isAdmin();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/');
-  };
+  // Keep Sidebar positioned *after* the top Navbar.
+  // Navbar height is ~72px (py-4 + content). If you change Navbar vertical padding, adjust this.
+  const NAVBAR_OFFSET = 'top-[72px]';
 
   return (
     <>
       {/* Backdrop (mobile) */}
       {open && (
         <div
-          className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+          className={`fixed inset-x-0 bottom-0 ${NAVBAR_OFFSET} z-20 bg-black/40 lg:hidden`}
           onClick={onClose}
         />
       )}
 
       <aside
         className={[
-          'fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-white border-r border-zinc-200',
+          'fixed inset-x-0 left-0 z-30 flex w-64 flex-col bg-white border-r border-zinc-200',
+          `bottom-0 ${NAVBAR_OFFSET}`,
           'dark:bg-zinc-950 dark:border-zinc-800',
           'transition-transform duration-200',
           open ? 'translate-x-0' : '-translate-x-full',
-          'lg:static lg:translate-x-0 lg:flex',
+          // Desktop: sidebar in normal flow, sticky below Navbar
+          'lg:sticky lg:translate-x-0 lg:flex lg:top-[72px] lg:h-[calc(100dvh-72px)]',
         ].join(' ')}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
-          <span className="font-bold text-lg tracking-tight text-violet-600 dark:text-violet-400">
-            Smart Campus
-          </span>
-          <button
-            onClick={onClose}
-            className="lg:hidden p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {/* Mobile close button (kept inside nav to avoid empty header space) */}
+          <div className="flex justify-end lg:hidden pb-2">
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
+              aria-label="Close sidebar"
+            >
+              <X size={18} />
+            </button>
+          </div>
           <NavLink
             to="/dashboard"
             className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
@@ -107,16 +102,7 @@ export default function Sidebar({ open, onClose }) {
           )}
         </nav>
 
-        {/* Footer */}
-        <div className="px-3 py-4 border-t border-zinc-200 dark:border-zinc-800">
-          <button
-            onClick={handleLogout}
-            className={`${navItem} w-full text-left text-red-500 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-500/10`}
-          >
-            <LogOut size={18} />
-            Sign Out
-          </button>
-        </div>
+        {/* Footer intentionally omitted: Sign out lives in top header */}
       </aside>
     </>
   );

@@ -10,10 +10,22 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(() => checkTokenValid());
 
+  const isValidPictureSrc = (value) => {
+    if (!value || typeof value !== 'string') return false;
+    return (
+      value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('data:image/')
+    );
+  };
+
   // Helper to decode JWT payload
   const decodeToken = (token) => {
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const payloadBase64Url = token.split('.')[1];
+      const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const padded = payloadBase64.padEnd(payloadBase64.length + (4 - (payloadBase64.length % 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded));
       return payload;
     } catch (e) {
       return null;
@@ -28,23 +40,26 @@ export const AuthProvider = ({ children }) => {
       if (decodedUser) {
         // Recover large base64 picture from local cache since backend JWT omits it to save header size
         const savedPic = localStorage.getItem('user_pic');
-        if (!decodedUser.picture && savedPic) {
+        if (!isValidPictureSrc(decodedUser.picture) && isValidPictureSrc(savedPic)) {
           decodedUser.picture = savedPic;
-        } else if (decodedUser.picture) {
+        } else if (isValidPictureSrc(decodedUser.picture)) {
           localStorage.setItem('user_pic', decodedUser.picture);
+        } else if (decodedUser.picture && !isValidPictureSrc(decodedUser.picture)) {
+          // Ignore invalid non-url values (prevents broken <img> src like "profile")
+          decodedUser.picture = '';
         }
         setUser(decodedUser);
         setIsAuthenticated(true);
 
         // If key fields are missing from token (common after relogin for big picture),
         // fetch the full user record once and merge it.
-        if (!decodedUser.picture || !decodedUser.provider) {
+        if (!isValidPictureSrc(decodedUser.picture) || !decodedUser.provider) {
           const id = decodedUser.userId || decodedUser.sub || decodedUser.id;
           if (id) {
             (async () => {
               try {
                 const freshUser = await userService.getUserById(id);
-                if (freshUser?.picture) localStorage.setItem('user_pic', freshUser.picture);
+                if (isValidPictureSrc(freshUser?.picture)) localStorage.setItem('user_pic', freshUser.picture);
                 setUser(prev => ({ ...prev, ...freshUser }));
               } catch (e) {
                 // Non-fatal: profile will fall back to avatar placeholder
@@ -88,11 +103,11 @@ export const AuthProvider = ({ children }) => {
     }
 
     if (mergedUser) {
-      if (mergedUser.picture) {
+      if (isValidPictureSrc(mergedUser.picture)) {
         localStorage.setItem('user_pic', mergedUser.picture);
       } else {
         const savedPic = localStorage.getItem('user_pic');
-        if (savedPic) mergedUser.picture = savedPic;
+        if (isValidPictureSrc(savedPic)) mergedUser.picture = savedPic;
       }
     }
     
