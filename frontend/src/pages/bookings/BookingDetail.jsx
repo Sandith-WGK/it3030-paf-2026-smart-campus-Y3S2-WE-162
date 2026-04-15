@@ -12,6 +12,7 @@ import {
   XCircle,
   Trash2,
   FileDown,
+  RefreshCw,
 } from 'lucide-react';
 import Layout from '../../components/layout/Layout';
 import BookingStatusBadge from '../../components/booking/BookingStatusBadge';
@@ -102,6 +103,7 @@ export default function BookingDetail() {
   const canCancel = booking.status === 'APPROVED';
   const canDelete =
     admin || booking.status === 'PENDING' || booking.status === 'CANCELLED';
+  const canRebook = booking.status === 'REJECTED' || booking.status === 'CANCELLED';
 
   const detail = (Icon, label, value) =>
     value ? (
@@ -187,6 +189,15 @@ export default function BookingDetail() {
               >
                 <Pencil size={14} />
                 Edit
+              </button>
+            )}
+            {canRebook && (
+              <button
+                onClick={() => navigate(`/bookings/new?rebook=${id}`)}
+                className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg text-violet-600 bg-violet-50 hover:bg-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20 transition-colors"
+              >
+                <RefreshCw size={14} />
+                Rebook
               </button>
             )}
             {canCancel && (
