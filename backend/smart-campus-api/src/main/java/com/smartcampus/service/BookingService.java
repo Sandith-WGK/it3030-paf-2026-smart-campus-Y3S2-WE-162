@@ -269,6 +269,24 @@ public class BookingService {
                     booking.getId(),
                     "BOOKING"
             );
+        } else if (!isAdmin && booking.getUserId().equals(userId)) {
+            // Notify all admins when a user cancels their own booking
+            List<User> admins = userRepository.findByRole(Role.ADMIN);
+            User user = userRepository.findById(userId).orElse(null);
+            String userName = user != null ? user.getName() : "A user";
+            String resourceName = resource != null ? resource.getName() : "resource";
+            
+            for (User admin : admins) {
+                notificationService.sendNotification(
+                        admin.getId(),
+                        String.format("%s has cancelled their booking for %s on %s", 
+                                userName, resourceName, saved.getDate()),
+                        NotifType.BOOKING_CANCELLED,
+                        Severity.INFO,
+                        saved.getId(),
+                        "BOOKING"
+                );
+            }
         }
 
         User user = userRepository.findById(booking.getUserId()).orElse(null);

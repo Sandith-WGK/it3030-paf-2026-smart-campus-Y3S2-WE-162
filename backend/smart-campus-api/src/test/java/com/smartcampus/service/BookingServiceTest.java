@@ -396,13 +396,22 @@ class BookingServiceTest {
 
             when(bookingRepository.findById("booking-003")).thenReturn(Optional.of(approved));
             when(bookingRepository.save(any(Booking.class))).thenAnswer(inv -> inv.getArgument(0));
-            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
+            User adminUser = User.builder().id("admin-001").role(Role.ADMIN).build();
+            when(userRepository.findByRole(Role.ADMIN)).thenReturn(List.of(adminUser));
             when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
 
             BookingResponse result = bookingService.cancelBooking("booking-003", USER_ID, false);
 
             assertThat(result.getStatus()).isEqualTo(BookingStatus.CANCELLED);
-            verify(notificationService, never()).sendNotification(anyString(), anyString(), any(), any(), anyString(), anyString());
+            verify(notificationService).sendNotification(
+                    eq("admin-001"),
+                    contains("has cancelled their booking"),
+                    eq(NotifType.BOOKING_CANCELLED),
+                    eq(Severity.INFO),
+                    eq("booking-003"),
+                    eq("BOOKING")
+            );
         }
 
         @Test

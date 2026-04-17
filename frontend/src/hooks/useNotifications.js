@@ -56,9 +56,25 @@ export const useNotifications = (userId, token) => {
         });
       });
 
-      // Audio Alert
-      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-      audio.volume = 0.5;
+      // Audio Alert based on category
+      const getSoundUrl = () => {
+        const type = notif.type;
+        const severity = notif.severity;
+
+        if (type === 'SECURITY_UPDATE') {
+          return 'https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3'; // Urgent Pulse
+        }
+        if (type === 'BOOKING_APPROVED' || severity === 'SUCCESS') {
+          return 'https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3'; // Bright Chime
+        }
+        if (type === 'BOOKING_REJECTED' || type === 'BOOKING_CANCELLED' || severity === 'ALERT') {
+          return 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'; // Caution Tone
+        }
+        return 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Standard Bell
+      };
+
+      const audio = new Audio(getSoundUrl());
+      audio.volume = 0.4; // Slightly lower volume for better UX
       audio.play().catch(() => {});
 
       setNotifications((prev) => {
