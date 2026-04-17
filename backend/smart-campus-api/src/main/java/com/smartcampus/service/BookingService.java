@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +50,7 @@ public class BookingService {
         validateTimeRange(request.getStartTime(), request.getEndTime());
         validateWithinAvailabilityWindow(resource, request.getStartTime(), request.getEndTime());
         validateCapacity(resource, request.getExpectedAttendees());
+        checkForDuplicateBooking(request.getResourceId(), userId, request.getDate(), request.getStartTime(), request.getEndTime(), null);
         checkForConflicts(request.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), null);
 
         Booking booking = Booking.builder()
@@ -156,7 +158,8 @@ public class BookingService {
         validateResourceAvailability(resource);
         validateWithinAvailabilityWindow(resource, request.getStartTime(), request.getEndTime());
         validateCapacity(resource, request.getExpectedAttendees());
-        checkForConflicts(booking.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), null);
+        checkForDuplicateBooking(booking.getResourceId(), userId, request.getDate(), request.getStartTime(), request.getEndTime(), bookingId);
+        checkForConflicts(booking.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), bookingId);
 
         booking.setDate(request.getDate());
         booking.setStartTime(request.getStartTime());
@@ -178,14 +181,18 @@ public class BookingService {
             throw new InvalidBookingStateException("Only pending bookings can be approved");
         }
 
+        Resource resource = resourceRepository.findById(booking.getResourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", booking.getResourceId()));
+
+        // Exclusive mode: block if any other APPROVED booking overlaps this slot.
+        // PENDING bookings are not counted — admin may approve whichever one they choose first.
         checkForConflicts(booking.getResourceId(), booking.getDate(),
-                booking.getStartTime(), booking.getEndTime(), null);
+                booking.getStartTime(), booking.getEndTime(), booking.getId());
 
         booking.setStatus(BookingStatus.APPROVED);
         Booking saved = bookingRepository.save(booking);
 
-        Resource resource = resourceRepository.findById(booking.getResourceId()).orElse(null);
-        String resourceName = resource != null ? resource.getName() : "resource";
+        String resourceName = resource.getName();
 
         notificationRepository.save(Notification.builder()
                 .userId(booking.getUserId())
@@ -284,8 +291,19 @@ public class BookingService {
     public List<BookingResponse> getResourceSchedule(String resourceId, LocalDate date) {
         Resource resource = resourceRepository.findById(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", resourceId));
-        List<Booking> bookings = bookingRepository
+
+        // Returns APPROVED bookings (for timeline rendering) AND PENDING bookings
+        // (so the frontend can detect duplicate bookings for the current user via userDuplicate check).
+        // The frontend filters to APPROVED-only before rendering the timeline blocks.
+        List<Booking> approved = bookingRepository
                 .findByResourceIdAndDateAndStatus(resourceId, date, BookingStatus.APPROVED);
+        List<Booking> pending = bookingRepository
+                .findByResourceIdAndDateAndStatus(resourceId, date, BookingStatus.PENDING);
+
+        List<Booking> bookings = new ArrayList<>();
+        bookings.addAll(approved);  // APPROVED first — frontend can filter by status field
+        bookings.addAll(pending);
+
         Map<String, User> userMap = buildUserMap(bookings);
         return bookings.stream()
                 .map(b -> BookingResponse.from(b, resource, userMap.get(b.getUserId())))
@@ -338,6 +356,34 @@ public class BookingService {
         }
     }
 
+
+    /**
+     * Throws BookingConflictException if the requesting user already has an active
+     * (PENDING or APPROVED) booking for the same resource at an overlapping time.
+     * Prevents duplicate bookings from the same user.
+     */
+    private void checkForDuplicateBooking(String resourceId, String userId,
+            LocalDate date, LocalTime startTime, LocalTime endTime,
+            String excludeBookingId) {
+        List<Booking> duplicates = bookingRepository
+                .findUserOverlappingBookings(resourceId, userId, date, startTime, endTime);
+
+        if (excludeBookingId != null) {
+            duplicates = duplicates.stream()
+                    .filter(b -> !b.getId().equals(excludeBookingId))
+                    .collect(Collectors.toList());
+        }
+
+        if (!duplicates.isEmpty()) {
+            Booking existing = duplicates.get(0);
+            throw new BookingConflictException(String.format(
+                    "You already have a %s booking for this resource on %s (%s – %s). " +
+                    "Please edit or cancel your existing booking instead.",
+                    existing.getStatus(), existing.getDate(),
+                    existing.getStartTime(), existing.getEndTime()));
+        }
+    }
+
     /**
      * Throws BookingConflictException if any APPROVED booking overlaps the requested slot.
      * The excludeBookingId parameter is reserved for future use (e.g., update self-check).
@@ -356,8 +402,8 @@ public class BookingService {
         if (!conflicts.isEmpty()) {
             Booking conflict = conflicts.get(0);
             throw new BookingConflictException(String.format(
-                    "Time slot conflicts with an existing approved booking (%s – %s on %s)",
-                    conflict.getStartTime(), conflict.getEndTime(), conflict.getDate()));
+                    "Time slot conflicts with an existing approved booking [ID: %s] (%s – %s on %s)",
+                    conflict.getId(), conflict.getStartTime(), conflict.getEndTime(), conflict.getDate()));
         }
     }
 
