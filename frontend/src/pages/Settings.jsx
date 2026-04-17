@@ -1,11 +1,11 @@
 import React from 'react';
-import { motion } from 'framer-motion';
+import * as motion from 'framer-motion';
 import { 
   Moon, Sun, Monitor, Bell, Volume2, Mail, 
   Smartphone, ShieldCheck, User as UserIcon, Save
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
@@ -62,7 +62,7 @@ export default function Settings() {
 
   return (
     <Layout title="Settings">
-      <motion.div 
+      <motion.motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-4xl mx-auto"

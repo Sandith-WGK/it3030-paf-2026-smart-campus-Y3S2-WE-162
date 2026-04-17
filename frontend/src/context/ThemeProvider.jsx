@@ -1,14 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ThemeContext } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { userService } from '../services/api/userService';
-
-const ThemeContext = createContext({
-  theme: 'SYSTEM',
-  resolvedTheme: 'light',
-  setTheme: () => {},
-  toggleTheme: () => {},
-  preferences: {}
-});
 
 export const ThemeProvider = ({ children }) => {
   const { user, isAuthenticated } = useAuth();
@@ -67,29 +60,43 @@ export const ThemeProvider = ({ children }) => {
   useEffect(() => {
     if (isAuthenticated && user?.preferences) {
       const backendPrefs = user.preferences;
-      setThemeState(backendPrefs.theme || 'SYSTEM');
-      
+      const nextTheme = backendPrefs.theme || 'SYSTEM';
+
+      // Only update theme if it actually changed
+      setThemeState((prev) => (prev === nextTheme ? prev : nextTheme));
+
       const newPrefs = {
         enableSounds: backendPrefs.enableSounds ?? true,
         enableEmailNotifications: backendPrefs.enableEmailNotifications ?? true,
         enablePushNotifications: backendPrefs.enablePushNotifications ?? true
       };
-      setPreferences(newPrefs);
-      localStorage.setItem('user_prefs', JSON.stringify(newPrefs));
+      
+      // Only update prefs if they actually changed
+      setPreferences((prev) => {
+        const same =
+          prev.enableSounds === newPrefs.enableSounds &&
+          prev.enableEmailNotifications === newPrefs.enableEmailNotifications &&
+          prev.enablePushNotifications === newPrefs.enablePushNotifications;
+
+        if (same) return prev;
+        localStorage.setItem('user_prefs', JSON.stringify(newPrefs));
+        return newPrefs;
+      });
     }
   }, [isAuthenticated, user]);
 
   const updatePreferences = useCallback(async (updates) => {
-    const newPrefs = { ...preferences, ...updates };
+    const newTheme = updates.theme || theme;
+    const newPrefs = { ...preferences, ...updates, theme: newTheme };
+    
+    // Update local state first
     setPreferences(newPrefs);
     localStorage.setItem('user_prefs', JSON.stringify(newPrefs));
+    if (updates.theme) setThemeState(updates.theme);
 
-    if (isAuthenticated && user?.id) {
+    if (isAuthenticated && user?.userId) {
        try {
-         await userService.updatePreferences(user.id, {
-           ...updates,
-           theme: updates.theme || theme
-         });
+         await userService.updatePreferences(user.userId, updates);
        } catch (error) {
          console.error('Failed to sync preferences to backend:', error);
        }
@@ -98,8 +105,8 @@ export const ThemeProvider = ({ children }) => {
 
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
-    if (isAuthenticated && user?.id) {
-      userService.updatePreferences(user.id, { theme: newTheme }).catch(err => console.error(err));
+    if (isAuthenticated && user?.userId) {
+      userService.updatePreferences(user.userId, { theme: newTheme }).catch(err => console.error(err));
     }
   }, [isAuthenticated, user]);
 
@@ -121,5 +128,3 @@ export const ThemeProvider = ({ children }) => {
     </ThemeContext.Provider>
   );
 };
-
-export const useTheme = () => useContext(ThemeContext);
