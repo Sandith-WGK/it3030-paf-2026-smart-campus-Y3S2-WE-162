@@ -51,7 +51,6 @@ public class BookingService {
         validateWithinAvailabilityWindow(resource, request.getStartTime(), request.getEndTime());
         validateCapacity(resource, request.getExpectedAttendees());
         checkForDuplicateBooking(request.getResourceId(), userId, request.getDate(), request.getStartTime(), request.getEndTime(), null);
-        validateAggregateCapacity(resource, request.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), request.getExpectedAttendees(), null);
         checkForConflicts(request.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), null);
 
         Booking booking = Booking.builder()
@@ -160,7 +159,6 @@ public class BookingService {
         validateWithinAvailabilityWindow(resource, request.getStartTime(), request.getEndTime());
         validateCapacity(resource, request.getExpectedAttendees());
         checkForDuplicateBooking(booking.getResourceId(), userId, request.getDate(), request.getStartTime(), request.getEndTime(), bookingId);
-        validateAggregateCapacity(resource, booking.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), request.getExpectedAttendees(), bookingId);
         checkForConflicts(booking.getResourceId(), request.getDate(), request.getStartTime(), request.getEndTime(), bookingId);
 
         booking.setDate(request.getDate());
@@ -183,14 +181,18 @@ public class BookingService {
             throw new InvalidBookingStateException("Only pending bookings can be approved");
         }
 
+        Resource resource = resourceRepository.findById(booking.getResourceId())
+                .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", booking.getResourceId()));
+
+        // Exclusive mode: block if any other APPROVED booking overlaps this slot.
+        // PENDING bookings are not counted — admin may approve whichever one they choose first.
         checkForConflicts(booking.getResourceId(), booking.getDate(),
-                booking.getStartTime(), booking.getEndTime(), null);
+                booking.getStartTime(), booking.getEndTime(), booking.getId());
 
         booking.setStatus(BookingStatus.APPROVED);
         Booking saved = bookingRepository.save(booking);
 
-        Resource resource = resourceRepository.findById(booking.getResourceId()).orElse(null);
-        String resourceName = resource != null ? resource.getName() : "resource";
+        String resourceName = resource.getName();
 
         notificationRepository.save(Notification.builder()
                 .userId(booking.getUserId())
@@ -289,14 +291,19 @@ public class BookingService {
     public List<BookingResponse> getResourceSchedule(String resourceId, LocalDate date) {
         Resource resource = resourceRepository.findById(resourceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Resource", "id", resourceId));
-        // Return both APPROVED and PENDING so the timeline shows all active bookings
+
+        // Returns APPROVED bookings (for timeline rendering) AND PENDING bookings
+        // (so the frontend can detect duplicate bookings for the current user via userDuplicate check).
+        // The frontend filters to APPROVED-only before rendering the timeline blocks.
         List<Booking> approved = bookingRepository
                 .findByResourceIdAndDateAndStatus(resourceId, date, BookingStatus.APPROVED);
         List<Booking> pending = bookingRepository
                 .findByResourceIdAndDateAndStatus(resourceId, date, BookingStatus.PENDING);
+
         List<Booking> bookings = new ArrayList<>();
-        bookings.addAll(approved);
+        bookings.addAll(approved);  // APPROVED first — frontend can filter by status field
         bookings.addAll(pending);
+
         Map<String, User> userMap = buildUserMap(bookings);
         return bookings.stream()
                 .map(b -> BookingResponse.from(b, resource, userMap.get(b.getUserId())))
@@ -349,39 +356,6 @@ public class BookingService {
         }
     }
 
-    /**
-     * Validates that the sum of expected attendees across ALL overlapping APPROVED/PENDING
-     * bookings (excluding the booking being updated) does not exceed resource capacity.
-     * This prevents multiple concurrent bookings from collectively overflowing the room.
-     */
-    private void validateAggregateCapacity(Resource resource, String resourceId,
-            LocalDate date, LocalTime startTime, LocalTime endTime,
-            Integer expectedAttendees, String excludeBookingId) {
-        if (resource.getCapacity() == null || expectedAttendees == null) return;
-
-        List<Booking> overlapping = bookingRepository
-                .findOverlappingActiveBookings(resourceId, date, startTime, endTime);
-
-        if (excludeBookingId != null) {
-            overlapping = overlapping.stream()
-                    .filter(b -> !b.getId().equals(excludeBookingId))
-                    .collect(Collectors.toList());
-        }
-
-        int existingTotal = overlapping.stream()
-                .mapToInt(b -> b.getExpectedAttendees() != null ? b.getExpectedAttendees() : 0)
-                .sum();
-
-        if (existingTotal + expectedAttendees > resource.getCapacity()) {
-            int remaining = resource.getCapacity() - existingTotal;
-            throw new InvalidBookingStateException(String.format(
-                    "Total attendees (%d existing + %d new = %d) exceed resource capacity (%d). " +
-                    "Only %d spot(s) remaining in this time slot.",
-                    existingTotal, expectedAttendees,
-                    existingTotal + expectedAttendees,
-                    resource.getCapacity(), Math.max(remaining, 0)));
-        }
-    }
 
     /**
      * Throws BookingConflictException if the requesting user already has an active
@@ -428,8 +402,10 @@ public class BookingService {
         if (!conflicts.isEmpty()) {
             Booking conflict = conflicts.get(0);
             throw new BookingConflictException(String.format(
-                    "Time slot conflicts with an existing approved booking (%s – %s on %s)",
-                    conflict.getStartTime(), conflict.getEndTime(), conflict.getDate()));
+                    "Cannot approve: this time slot (%s – %s on %s) is already taken by an approved booking " +
+                    "[ID: %s]. Please reject this request or cancel the existing booking first.",
+                    conflict.getStartTime(), conflict.getEndTime(), conflict.getDate(),
+                    conflict.getId()));
         }
     }
 
