@@ -55,6 +55,9 @@ public class User {
     @JsonIgnore
     private Instant twoFactorCodeExpiresAt;
 
+    @Builder.Default
+    private UserPreference preferences = new UserPreference();
+
     @CreatedDate
     private Instant createdAt;
 }

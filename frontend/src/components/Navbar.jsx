@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 // eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  LogOut, User as UserIcon, Settings, ChevronDown, Bell, Moon, Sun
+  LogOut, User as UserIcon, Settings as SettingsIcon, ChevronDown, Bell, Moon, Sun
 } from 'lucide-react';
 
 const Navbar = ({ leftSlot = null }) => {
   const { user, logout } = useAuth();
+  const { toggleTheme, resolvedTheme } = useTheme();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -43,6 +45,15 @@ const Navbar = ({ leftSlot = null }) => {
       </div>
 
       <div className="flex items-center gap-6">
+        {/* Toggle Theme */}
+        <button 
+          onClick={toggleTheme}
+          className="p-2 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all border border-transparent hover:border-violet-200 dark:hover:border-violet-800 shadow-sm"
+          title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
+        >
+          {resolvedTheme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+        </button>
+
         <div className="relative" ref={dropdownRef}>
           <button 
             onClick={() => setIsOpen(!isOpen)}
@@ -87,10 +98,14 @@ const Navbar = ({ leftSlot = null }) => {
                   My Profile
                 </Link>
 
-                <button className="w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all">
-                  <Settings size={18} />
+                <Link 
+                  to="/settings" 
+                  onClick={() => setIsOpen(false)}
+                  className="w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-all"
+                >
+                  <SettingsIcon size={18} />
                   Settings
-                </button>
+                </Link>
 
                 <div className="my-2 border-t border-zinc-100 dark:border-zinc-800"></div>
 
