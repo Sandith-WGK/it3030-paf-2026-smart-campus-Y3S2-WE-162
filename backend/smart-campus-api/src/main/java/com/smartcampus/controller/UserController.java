@@ -72,6 +72,12 @@ public class UserController {
         return ResponseEntity.ok(new AuthResponse(newToken, updated));
     }
 
+    @PutMapping("/{id}/preferences")
+    @PreAuthorize("hasRole('ADMIN') or #id == principal.userId")
+    public ResponseEntity<User> updatePreferences(@PathVariable String id, @RequestBody com.smartcampus.dto.UserPreferenceUpdateRequest request) {
+        return ResponseEntity.ok(userService.updateUserPreferences(id, request));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteUser(@PathVariable String id) {

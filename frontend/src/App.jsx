@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import VerifyEmail from './pages/VerifyEmail';
 import VerifyTwoFactor from './pages/VerifyTwoFactor';
+import Settings from './pages/Settings';
 
 // Booking pages
 import MyBookings from './pages/bookings/MyBookings';
@@ -74,6 +75,7 @@ function App() {
       {/* Protected routes (USER) */}
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
 
       {/* Booking routes (USER + ADMIN) */}
       <Route path="/bookings" element={<PrivateRoute><MyBookings /></PrivateRoute>} />

@@ -120,6 +120,22 @@ public class UserService {
         throw new RuntimeException("User not found with id: " + id);
     }
 
+    public User updateUserPreferences(String userId, com.smartcampus.dto.UserPreferenceUpdateRequest request) {
+        User user = getUserById(userId);
+        com.smartcampus.model.UserPreference prefs = user.getPreferences();
+        if (prefs == null) {
+            prefs = new com.smartcampus.model.UserPreference();
+        }
+
+        if (request.getTheme() != null) prefs.setTheme(request.getTheme());
+        if (request.getEnableSounds() != null) prefs.setEnableSounds(request.getEnableSounds());
+        if (request.getEnableEmailNotifications() != null) prefs.setEnableEmailNotifications(request.getEnableEmailNotifications());
+        if (request.getEnablePushNotifications() != null) prefs.setEnablePushNotifications(request.getEnablePushNotifications());
+
+        user.setPreferences(prefs);
+        return userRepository.save(user);
+    }
+
     public void deleteUser(String id) {
         userRepository.deleteById(id);
     }
