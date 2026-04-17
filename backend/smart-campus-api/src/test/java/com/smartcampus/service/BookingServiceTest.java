@@ -294,13 +294,15 @@ class BookingServiceTest {
                     .status(BookingStatus.APPROVED)
                     .build();
 
+            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
             when(bookingRepository.findById("booking-pending")).thenReturn(Optional.of(pendingBooking));
             when(bookingRepository.findConflictingBookings("res-001", FUTURE_DATE,
                     LocalTime.of(10, 0), LocalTime.of(11, 0)))
                     .thenReturn(List.of(alreadyApproved));
 
             assertThatThrownBy(() -> bookingService.approveBooking("booking-pending"))
-                    .isInstanceOf(BookingConflictException.class);
+                    .isInstanceOf(BookingConflictException.class)
+                    .hasMessageContaining("conflicts");
         }
     }
 
@@ -578,8 +580,8 @@ class BookingServiceTest {
     class ResourceSchedule {
 
         @Test
-        @DisplayName("returns only APPROVED bookings for a resource on a date")
-        void returnsApprovedBookings() {
+        @DisplayName("returns APPROVED and PENDING bookings for a resource on a date")
+        void returnsApprovedAndPendingBookings() {
             Booking approved = Booking.builder()
                     .id("booking-001")
                     .resourceId("res-001")
@@ -593,6 +595,8 @@ class BookingServiceTest {
             when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
             when(bookingRepository.findByResourceIdAndDateAndStatus("res-001", FUTURE_DATE, BookingStatus.APPROVED))
                     .thenReturn(List.of(approved));
+            when(bookingRepository.findByResourceIdAndDateAndStatus("res-001", FUTURE_DATE, BookingStatus.PENDING))
+                    .thenReturn(List.of());
             when(userRepository.findAllById(List.of(USER_ID))).thenReturn(List.of(testUser));
 
             List<BookingResponse> schedule = bookingService.getResourceSchedule("res-001", FUTURE_DATE);

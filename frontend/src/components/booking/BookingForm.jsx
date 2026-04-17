@@ -620,7 +620,6 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                     <BookingTimeline
                       bookings={approvedBookings}
                       selectedRange={selectedRange}
-                      capacity={activeResource?.capacity}
                       slotBooked={slotBooked}
                     />
 
@@ -667,7 +666,7 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                         </div>
                       </div>
                     ) : (
-                      !slotFull && (
+                      !slotBooked && (
                         <p className="text-xs mt-3 font-medium">
                           {approvedBookings.length > 0 ? (
                             <span className="text-red-500">No completely free slots remaining on this date.</span>

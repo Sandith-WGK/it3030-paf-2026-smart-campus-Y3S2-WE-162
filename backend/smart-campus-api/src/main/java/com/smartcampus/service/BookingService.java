@@ -402,10 +402,8 @@ public class BookingService {
         if (!conflicts.isEmpty()) {
             Booking conflict = conflicts.get(0);
             throw new BookingConflictException(String.format(
-                    "Cannot approve: this time slot (%s – %s on %s) is already taken by an approved booking " +
-                    "[ID: %s]. Please reject this request or cancel the existing booking first.",
-                    conflict.getStartTime(), conflict.getEndTime(), conflict.getDate(),
-                    conflict.getId()));
+                    "Time slot conflicts with an existing approved booking [ID: %s] (%s – %s on %s)",
+                    conflict.getId(), conflict.getStartTime(), conflict.getEndTime(), conflict.getDate()));
         }
     }
 

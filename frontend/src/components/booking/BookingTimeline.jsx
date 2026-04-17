@@ -21,10 +21,9 @@ const HOUR_MARKS = Array.from({ length: 16 }, (_, i) => i + 7); // 07 – 22
  *  bookings      – APPROVED-only booking list (filtered by parent)
  *  highlightId   – optional booking id to ring-highlight
  *  selectedRange – { start: 'HH:MM', end: 'HH:MM' } for the violet overlay
- *  capacity      – total resource capacity (number) — kept for future use
  *  slotBooked    – boolean: true if any approved booking overlaps the selected range
  */
-export default function BookingTimeline({ bookings = [], highlightId, selectedRange, capacity, slotBooked }) {
+export default function BookingTimeline({ bookings = [], highlightId, selectedRange, slotBooked }) {
   const selectedStart = selectedRange ? timeToMinutes(selectedRange.start) : null;
   const selectedEnd   = selectedRange ? timeToMinutes(selectedRange.end)   : null;
   const selectedValid =
