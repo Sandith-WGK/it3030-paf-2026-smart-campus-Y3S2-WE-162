@@ -12,6 +12,7 @@ import {
   Wrench,
   Bell,
   X,
+  Ticket,
 } from 'lucide-react';
 import bookingService from '../../services/api/bookingService';
 
@@ -170,6 +171,15 @@ export default function Sidebar({ open, onClose }) {
               >
                 <Package size={18} />
                 Manage Resources
+              </NavLink>
+
+              <NavLink
+                to="/admin/tickets"
+                className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
+                onClick={onClose}
+              >
+                <Ticket size={18} />
+                Manage Tickets
               </NavLink>
             </>
           )}
