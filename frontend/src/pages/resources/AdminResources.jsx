@@ -6,7 +6,7 @@ import {
   Plus, Download, Upload, Edit, Trash2, X, 
   Building2, FlaskConical, DoorOpen, Wrench,
   ChevronLeft, ChevronRight, AlertCircle,
-  Search, Loader2, CheckCircle
+  Search, Loader2, CheckCircle, Power, PowerOff
 } from 'lucide-react';
 import Layout from '../../components/layout/Layout';
 import Toast from '../../components/common/Toast';
@@ -37,7 +37,8 @@ const TableSkeleton = () => (
         <div className="flex-1">
           <div className="h-4 bg-zinc-200 dark:bg-zinc-700 rounded w-20"></div>
         </div>
-        <div className="w-24 flex justify-end gap-2">
+        <div className="w-32 flex justify-end gap-2">
+          <div className="h-8 w-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
           <div className="h-8 w-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
           <div className="h-8 w-8 bg-zinc-200 dark:bg-zinc-700 rounded-lg"></div>
         </div>
@@ -83,7 +84,7 @@ const EmptyState = ({ hasFilters, onClearFilters, onAddResource }) => (
 
 /**
  * AdminResources - Admin management page for resources
- * Includes table view, CRUD operations, and import/export functionality
+ * Includes table view, CRUD operations, import/export, and direct status toggle
  */
 const AdminResources = () => {
   const navigate = useNavigate();
@@ -102,6 +103,9 @@ const AdminResources = () => {
   // Delete confirmation modal
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+
+  // Status toggle loading states
+  const [togglingStatus, setTogglingStatus] = useState(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -124,6 +128,25 @@ const AdminResources = () => {
   useEffect(() => {
     fetchResources();
   }, [fetchResources]);
+
+  // Handle direct status toggle
+  const handleStatusToggle = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'ACTIVE' ? 'OUT_OF_SERVICE' : 'ACTIVE';
+    
+    setTogglingStatus(id);
+    try {
+      await resourceApi.updateStatus(id, newStatus);
+      setToast({ 
+        type: 'success', 
+        message: `Resource status changed to ${newStatus === 'ACTIVE' ? 'Active' : 'Out of Service'}` 
+      });
+      fetchResources(); // Refresh the list
+    } catch (err) {
+      setToast({ type: 'error', message: 'Failed to update resource status' });
+    } finally {
+      setTogglingStatus(null);
+    }
+  };
 
   // Handle delete
   const handleDeleteClick = (id) => {
@@ -375,6 +398,7 @@ const AdminResources = () => {
                       const typeConfig = getTypeConfig(resource.type);
                       const statusConfig = getStatusConfig(resource.status);
                       const TypeIcon = typeConfig.icon;
+                      const isToggling = togglingStatus === resource.id;
                       
                       return (
                         <Motion.tr
@@ -412,10 +436,25 @@ const AdminResources = () => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${statusConfig.bg} ${statusConfig.textColor}`}>
-                              <span className="w-1.5 h-1.5 rounded-full bg-current" />
-                              {statusConfig.text}
-                            </span>
+                            {/* Status Toggle Button - Direct update without edit form */}
+                            <button
+                              onClick={() => handleStatusToggle(resource.id, resource.status)}
+                              disabled={isToggling}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold rounded-full transition-all ${
+                                resource.status === 'ACTIVE' 
+                                  ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20' 
+                                  : 'bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-500/20'
+                              } disabled:opacity-50 disabled:cursor-not-allowed`}
+                            >
+                              {isToggling ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : resource.status === 'ACTIVE' ? (
+                                <Power size={12} />
+                              ) : (
+                                <PowerOff size={12} />
+                              )}
+                              <span>{statusConfig.text}</span>
+                            </button>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-zinc-600 dark:text-zinc-400">
