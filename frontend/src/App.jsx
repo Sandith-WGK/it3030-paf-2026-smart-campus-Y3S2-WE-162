@@ -27,6 +27,13 @@ import ResourceDetail from './pages/resources/ResourceDetail';
 import ResourceForm from './pages/resources/ResourceForm';
 import AdminResources from './pages/resources/AdminResources';
 
+// Ticket pages
+import MyTicketsPage from './pages/tickets/MyTicketsPage';
+import CreateTicketForm from './pages/tickets/CreateTicketForm';
+import TicketDetailPage from './pages/tickets/TicketDetailPage';
+import AdminTicketsPage from './pages/admin/AdminTicketsPage';
+
+
 // Wrapper for any authenticated route
 const PrivateRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
@@ -90,6 +97,11 @@ function App() {
       {/* Resource routes (USER + ADMIN) */}
       <Route path="/resources" element={<PrivateRoute><ResourceList /></PrivateRoute>} />
       <Route path="/resources/:id" element={<PrivateRoute><ResourceDetail /></PrivateRoute>} />
+       
+      {/* Ticket routes (USER + ADMIN) */}
+      <Route path="/tickets" element={<PrivateRoute><MyTicketsPage /></PrivateRoute>} />
+      <Route path="/tickets/new" element={<PrivateRoute><CreateTicketForm /></PrivateRoute>} />
+      <Route path="/tickets/:id" element={<PrivateRoute><TicketDetailPage /></PrivateRoute>} />
 
       {/* Admin routes */}
       <Route path="/admin/users" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
@@ -97,6 +109,7 @@ function App() {
       <Route path="/admin/resources" element={<AdminRoute><AdminResources /></AdminRoute>} />
       <Route path="/admin/resources/new" element={<AdminRoute><ResourceForm /></AdminRoute>} />
       <Route path="/admin/resources/:id/edit" element={<AdminRoute><ResourceForm /></AdminRoute>} />
+      <Route path="/admin/tickets" element={<AdminRoute><AdminTicketsPage /></AdminRoute>} />
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
