@@ -80,9 +80,16 @@ public class ResourceService {
      * Create a new resource with validation
      * @param resource Resource object to create
      * @return Created resource object
-     * @throws IllegalArgumentException if validation fails
+     * @throws IllegalArgumentException if validation fails or duplicate name
      */
     public Resource createResource(Resource resource) {
+        // ✅ UNIQUE NAME VALIDATION - Check if name already exists
+        if (resourceRepository.existsByName(resource.getName())) {
+            throw new IllegalArgumentException(
+                "Resource with name '" + resource.getName() + "' already exists. Please use a different name."
+            );
+        }
+        
         validateResource(resource);
         
         // Set default availability times if not provided
@@ -108,10 +115,21 @@ public class ResourceService {
      * @param updatedResource Updated resource object
      * @return Updated resource object
      * @throws ResourceNotFoundException if resource not found
-     * @throws IllegalArgumentException if validation fails
+     * @throws IllegalArgumentException if validation fails or duplicate name
      */
     public Resource updateResource(String id, Resource updatedResource) {
         Resource existingResource = getResourceById(id);
+
+        // ✅ UNIQUE NAME VALIDATION - Check if name is taken by another resource
+        // First check if the name has actually changed
+        if (!existingResource.getName().equals(updatedResource.getName())) {
+            // Only check uniqueness if name is being changed
+            if (resourceRepository.existsByName(updatedResource.getName())) {
+                throw new IllegalArgumentException(
+                    "Resource with name '" + updatedResource.getName() + "' already exists. Please use a different name."
+                );
+            }
+        }
 
         // Validate the updated resource
         validateResource(updatedResource);
