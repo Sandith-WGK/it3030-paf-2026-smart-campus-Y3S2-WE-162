@@ -165,7 +165,7 @@ const AdminResources = () => {
   // Import preview states
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewData, setPreviewData] = useState([]);
-  const [parsingPreview, setParsingPreview] = useState(false);
+ 
 
   // Delete confirmation modal
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -408,7 +408,7 @@ const AdminResources = () => {
   const getExportButtonText = () => {
     if (exporting) return 'Exporting...';
     if (hasFilters) {
-      const filterCount = (searchTerm ? 1 : 0) + (typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0);
+      
       return `Export Filtered (${filteredResources.length})`;
     }
     return `Export All (${resources.length})`;
