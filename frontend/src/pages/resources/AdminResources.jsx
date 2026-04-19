@@ -109,6 +109,44 @@ const parseCSVLine = (line) => {
 };
 
 /**
+ * Convert resources to CSV format
+ */
+const convertToCSV = (data) => {
+  if (!data || data.length === 0) return '';
+  
+  const headers = ['ID', 'Name', 'Type', 'Capacity', 'Location', 'Status', 'Availability Start', 'Availability End', 'Description'];
+  const rows = data.map(resource => [
+    resource.id || '',
+    resource.name || '',
+    resource.type || '',
+    resource.capacity || '',
+    resource.location || '',
+    resource.status || '',
+    resource.availabilityStart || '',
+    resource.availabilityEnd || '',
+    resource.description || ''
+  ]);
+  
+  const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+  return csvContent;
+};
+
+/**
+ * Download CSV file
+ */
+const downloadCSV = (csvContent, filename) => {
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.href = url;
+  link.setAttribute('download', filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+};
+
+/**
  * AdminResources - Admin management page for resources
  */
 const AdminResources = () => {
@@ -252,12 +290,42 @@ const AdminResources = () => {
     setDeleteTarget(null);
   };
 
-  // Handle export
+  // Handle export - respects current filters
   const handleExport = async () => {
     try {
       setExporting(true);
-      await resourceApi.exportResources();
-      setToast({ type: 'success', message: 'Resources exported successfully!' });
+      
+      // Get filtered resources based on current filters
+      let dataToExport = [...resources];
+      
+      // Apply search filter
+      if (searchTerm) {
+        dataToExport = dataToExport.filter(resource =>
+          resource.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          resource.location?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      
+      // Apply type filter
+      if (typeFilter !== 'ALL') {
+        dataToExport = dataToExport.filter(resource => resource.type === typeFilter);
+      }
+      
+      // Apply status filter
+      if (statusFilter !== 'ALL') {
+        dataToExport = dataToExport.filter(resource => resource.status === statusFilter);
+      }
+      
+      // Generate CSV and download
+      const csvContent = convertToCSV(dataToExport);
+      const fileName = hasFilters ? `resources_filtered_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv` : `resources_all_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`;
+      
+      downloadCSV(csvContent, fileName);
+      
+      setToast({ 
+        type: 'success', 
+        message: `Exported ${dataToExport.length} resource${dataToExport.length !== 1 ? 's' : ''} successfully!` 
+      });
     } catch {
       setToast({ type: 'error', message: 'Failed to export resources' });
     } finally {
@@ -336,6 +404,16 @@ const AdminResources = () => {
     setCurrentPage(1);
   };
 
+  // Get export button text based on filters
+  const getExportButtonText = () => {
+    if (exporting) return 'Exporting...';
+    if (hasFilters) {
+      const filterCount = (searchTerm ? 1 : 0) + (typeFilter !== 'ALL' ? 1 : 0) + (statusFilter !== 'ALL' ? 1 : 0);
+      return `Export Filtered (${filteredResources.length})`;
+    }
+    return `Export All (${resources.length})`;
+  };
+
   return (
     <Layout title="Resource Management">
       <div className="max-w-7xl mx-auto">
@@ -361,11 +439,11 @@ const AdminResources = () => {
             </button>
             <button
               onClick={handleExport}
-              disabled={exporting}
+              disabled={exporting || resources.length === 0}
               className="inline-flex items-center gap-2 bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              {exporting ? 'Exporting...' : 'Export CSV'}
+              {getExportButtonText()}
             </button>
             <button
               onClick={() => setShowImportModal(true)}
@@ -526,7 +604,7 @@ const AdminResources = () => {
         )}
       </AnimatePresence>
 
-      {/* Import Preview Modal - Without Start, End, and Description columns */}
+      {/* Import Preview Modal */}
       <AnimatePresence>
         {showPreviewModal && (
           <Motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-auto">
@@ -535,7 +613,7 @@ const AdminResources = () => {
                 <div>
                   <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Preview CSV Data</h2>
                   <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                    {previewData.length} rows previewed (showing first {previewData.length} rows)
+                    {previewData.length} rows previewed
                   </p>
                 </div>
                 <button onClick={() => { setShowPreviewModal(false); setImportFile(null); setPreviewData([]); }} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors"><X size={20} /></button>
