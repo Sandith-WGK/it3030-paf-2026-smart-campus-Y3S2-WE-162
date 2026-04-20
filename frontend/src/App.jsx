@@ -1,7 +1,7 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
-import { isAdmin } from './utils/auth';
+
 import Login from './pages/Login';
 import AuthCallback from './pages/AuthCallback';
 import Dashboard from './pages/Dashboard';
@@ -12,6 +12,7 @@ import ResetPassword from './pages/ResetPassword';
 import Profile from './pages/Profile';
 import VerifyEmail from './pages/VerifyEmail';
 import VerifyTwoFactor from './pages/VerifyTwoFactor';
+import Notifications from './pages/Notifications';
 
 // Booking pages
 import MyBookings from './pages/bookings/MyBookings';
@@ -66,9 +67,13 @@ const AdminRoute = ({ children }) => {
   return children;
 };
 
+import { Toaster } from 'react-hot-toast';
+
 function App() {
   return (
-    <Routes>
+    <>
+      <Toaster position="top-right" reverseOrder={false} />
+      <Routes>
       {/* Public routes */}
       <Route path="/" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
@@ -81,6 +86,7 @@ function App() {
       {/* Protected routes (USER) */}
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+      <Route path="/notifications" element={<PrivateRoute><Notifications /></PrivateRoute>} />
 
       {/* Booking routes (USER + ADMIN) */}
       <Route path="/bookings" element={<PrivateRoute><MyBookings /></PrivateRoute>} />
@@ -107,7 +113,8 @@ function App() {
 
       {/* Fallback */}
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </>
   );
 }
 

@@ -1,9 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+// eslint-disable-next-line no-unused-vars
 import { motion, AnimatePresence } from 'framer-motion';
+import { DayPicker } from 'react-day-picker';
+import 'react-day-picker/style.css';
 import resourceService from '../../services/api/resourceService';
 import bookingService from '../../services/api/bookingService';
 import BookingTimeline from './BookingTimeline';
-import { Loader2, Search, ChevronRight, ChevronLeft, Check } from 'lucide-react';
+import ConfirmModal from './ConfirmModal';
+import { CalendarDays, Clock, Loader2, Search, ChevronRight, ChevronLeft, Check } from 'lucide-react';
 
 // ─── Time utilities ────────────────────────────────────────────────────────────
 
@@ -21,7 +26,10 @@ function minutesToTime(m) {
 function computeAvailableSlots(bookings, windowStart, windowEnd) {
   const wsMin = timeToMinutes(windowStart);
   const weMin = timeToMinutes(windowEnd);
-  const sorted = [...bookings].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+  // Only APPROVED bookings are treated as occupied — PENDING ones are visible
+  // on the timeline (yellow) but don't block slot selection for new requests.
+  const occupiedBookings = bookings.filter((b) => b.status === 'APPROVED');
+  const sorted = [...occupiedBookings].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
   const gaps = [];
   let cursor = wsMin;
   for (const b of sorted) {
@@ -37,6 +45,17 @@ function computeAvailableSlots(bookings, windowStart, windowEnd) {
     gaps.push({ start: minutesToTime(cursor), end: minutesToTime(weMin) });
   }
   return gaps;
+}
+
+function generateTimeOptions(start = '07:00', end = '22:00') {
+  const opts = [];
+  let cur = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+  while (cur < endMin) {
+    opts.push(minutesToTime(cur));
+    cur += 30;
+  }
+  return opts;
 }
 
 // ─── Shared styles ─────────────────────────────────────────────────────────────
@@ -98,16 +117,14 @@ function StepIndicator({ steps, currentStep }) {
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-export default function BookingForm({ initial = {}, onSubmit, loading, submitLabel = 'Submit', fixedResourceId }) {
+export default function BookingForm({ initial = {}, onSubmit, loading, submitLabel = 'Submit', fixedResourceId, currentUserId }) {
+  const navigate = useNavigate();
   // When editing (fixedResourceId set), skip resource selection and start at date/time.
   const totalSteps = fixedResourceId ? 2 : 3;
   const stepLabels = fixedResourceId
     ? ['Date & Time', 'Details & Review']
     : ['Choose Resource', 'Date & Time', 'Details & Review'];
 
-  // realStep: 1=resource, 2=datetime, 3=details (always consistent)
-  // uiStep: what the user sees (1-based within stepLabels)
-  const toUiStep = (real) => (fixedResourceId ? real - 1 : real);
   const toRealStep = (ui) => (fixedResourceId ? ui + 1 : ui);
 
   const [uiStep, setUiStep] = useState(1);
@@ -186,7 +203,7 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
 
   useEffect(() => {
     if (!activeResourceId || !form.date) {
-      setSlots([]);
+      setSlots([]); // eslint-disable-line react-hooks/set-state-in-effect
       setAllBookings([]);
       return;
     }
@@ -208,6 +225,40 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
       .finally(() => setSlotsLoading(false));
   }, [activeResourceId, form.date, activeResource]);
 
+  // ── Derived: approved-only bookings + slot-specific conflict detection ──────────
+  const approvedBookings = useMemo(
+    () => allBookings.filter((b) => b.status === 'APPROVED'),
+    [allBookings],
+  );
+
+  // Exclusive mode: slot is blocked if ANY approved booking overlaps the selected range.
+  // false (not null) when no time is selected — the Next button stays enabled until
+  // the user picks times and we can legitimately evaluate a conflict.
+  const slotBooked = useMemo(() => {
+    if (!form.startTime || !form.endTime) return false;
+    return approvedBookings.some(
+      (b) => b.startTime < form.endTime && b.endTime > form.startTime,
+    );
+  }, [approvedBookings, form.startTime, form.endTime]);
+
+  // ── Duplicate booking detection ──────────────────────────────────────────────────
+  // Finds the current user's own PENDING/APPROVED booking that overlaps the
+  // selected slot. Only active on the new-booking flow (not edit).
+  const [duplicateBooking, setDuplicateBooking] = useState(null);
+
+  const userDuplicate = useMemo(() => {
+    if (!currentUserId || !form.startTime || !form.endTime) return null;
+    return (
+      allBookings.find(
+        (b) =>
+          (b.userId === currentUserId || b.userId === String(currentUserId)) &&
+          (b.status === 'PENDING' || b.status === 'APPROVED') &&
+          b.startTime < form.endTime &&
+          b.endTime > form.startTime,
+      ) ?? null
+    );
+  }, [allBookings, currentUserId, form.startTime, form.endTime]);
+
   // ── Validation ────────────────────────────────────────────────────────────────
   const validateStep = (step) => {
     const e = {};
@@ -220,6 +271,17 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
       if (!form.endTime) e.endTime = 'End time is required';
       if (form.startTime && form.endTime && form.startTime >= form.endTime)
         e.endTime = 'End time must be after start time';
+      // Past-time guard: if the selected date is today, start time must be in the future
+      if (form.date && form.startTime) {
+        const nowDate = new Date().toISOString().split('T')[0];
+        const nowTime = new Date().toTimeString().slice(0, 5);
+        if (form.date === nowDate && form.startTime <= nowTime)
+          e.startTime = 'Start time must be in the future for today.';
+        if (form.date < nowDate)
+          e.date = 'Cannot book a date in the past.';
+      }
+      if (slotBooked)
+        e.slot = 'This time slot already has an approved booking. Please choose a different time.';
     }
     if (step === 3) {
       if (!form.purpose || form.purpose.trim().length < 5)
@@ -242,6 +304,11 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
 
   const nextStep = () => {
     if (!validateStep(realStep)) return;
+    // Duplicate booking guard — only on new booking creation (not edit flow)
+    if (realStep === 2 && !fixedResourceId && userDuplicate) {
+      setDuplicateBooking(userDuplicate);
+      return;
+    }
     setUiStep((s) => Math.min(s + 1, totalSteps));
   };
 
@@ -250,8 +317,13 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
     setUiStep((s) => Math.max(s - 1, 1));
   };
 
+  // Track in-flight submission to prevent double-tap
+  const [submitting, setSubmitting] = useState(false);
+
   const handleFinalSubmit = () => {
     if (!validateStep(3)) return;
+    if (submitting) return; // guard against double-tap
+    setSubmitting(true);
     const payload = {
       ...(fixedResourceId ? {} : { resourceId: form.resourceId }),
       date: form.date,
@@ -260,12 +332,48 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
       purpose: form.purpose.trim(),
       expectedAttendees: form.expectedAttendees ? Number(form.expectedAttendees) : null,
     };
-    onSubmit(payload);
+    Promise.resolve(onSubmit(payload)).finally(() => setSubmitting(false));
   };
 
   const today = new Date().toISOString().split('T')[0];
   const selectedRange =
     form.startTime && form.endTime ? { start: form.startTime, end: form.endTime } : null;
+
+  // ── Calendar popover ──────────────────────────────────────────────────────────
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const calendarRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutside = (e) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target)) {
+        setCalendarOpen(false);
+      }
+    };
+    if (calendarOpen) document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [calendarOpen]);
+
+  const handleDateSelect = (date) => {
+    if (date) {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      setField('date', `${y}-${m}-${d}`);
+      setCalendarOpen(false);
+    }
+  };
+
+  // ── Time dropdowns ────────────────────────────────────────────────────────────
+  const timeOptions = useMemo(() => {
+    const s = String(activeResource?.availabilityStart ?? '07:00').substring(0, 5);
+    const e = String(activeResource?.availabilityEnd ?? '22:00').substring(0, 5);
+    return generateTimeOptions(s, e);
+  }, [activeResource]);
+
+  const endTimeOptions = useMemo(
+    () => (form.startTime ? timeOptions.filter((t) => t > form.startTime) : timeOptions),
+    [timeOptions, form.startTime],
+  );
 
   return (
     <div>
@@ -414,20 +522,93 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
               </div>
             )}
 
-            {/* Date */}
+            {/* ── Calendar date picker ── */}
             <div>
               <label className={labelClass}>Date *</label>
-              <input
-                type="date"
-                className={inputClass}
-                min={today}
-                value={form.date}
-                onChange={set('date')}
-              />
+              <div className="relative" ref={calendarRef}>
+                <button
+                  type="button"
+                  onClick={() => setCalendarOpen((o) => !o)}
+                  className={`${inputClass} text-left flex items-center gap-2 cursor-pointer`}
+                >
+                  <CalendarDays size={16} className="text-violet-500 shrink-0" />
+                  <span className={form.date ? '' : 'text-zinc-400 dark:text-zinc-500'}>
+                    {form.date
+                      ? new Date(form.date + 'T00:00:00').toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : 'Choose a date…'}
+                  </span>
+                </button>
+
+                {calendarOpen && (
+                  <div
+                    className="absolute z-50 top-full mt-1 left-0 rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-2xl overflow-hidden"
+                    style={{
+                      '--rdp-accent-color': '#7c3aed',
+                      '--rdp-accent-background-color': '#ede9fe',
+                    }}
+                  >
+                    <DayPicker
+                      mode="single"
+                      selected={form.date ? new Date(form.date + 'T00:00:00') : undefined}
+                      onSelect={handleDateSelect}
+                      disabled={{ before: new Date(today) }}
+                    />
+                  </div>
+                )}
+              </div>
               {errors.date && <p className={errorClass}>{errors.date}</p>}
             </div>
 
-            {/* Timeline + slots (shown once resource and date are selected) */}
+            {/* ── Time dropdowns — above the timeline so they act as input ── */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={labelClass}>
+                  <Clock size={13} className="inline mr-1 text-zinc-400" />
+                  Start Time *
+                </label>
+                <select
+                  className={inputClass}
+                  value={form.startTime}
+                  onChange={(e) => {
+                    set('startTime')(e);
+                    if (form.endTime && e.target.value >= form.endTime) {
+                      setField('endTime', '');
+                    }
+                  }}
+                >
+                  <option value="">-- Select --</option>
+                  {timeOptions.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                {errors.startTime && <p className={errorClass}>{errors.startTime}</p>}
+              </div>
+              <div>
+                <label className={labelClass}>
+                  <Clock size={13} className="inline mr-1 text-zinc-400" />
+                  End Time *
+                </label>
+                <select
+                  className={inputClass}
+                  value={form.endTime}
+                  onChange={set('endTime')}
+                  disabled={!form.startTime}
+                >
+                  <option value="">-- Select --</option>
+                  {endTimeOptions.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+                {errors.endTime && <p className={errorClass}>{errors.endTime}</p>}
+              </div>
+            </div>
+
+            {/* ── Timeline + capacity feedback (shown once date is chosen) ── */}
             {activeResourceId && form.date && (
               <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-4">
                 {slotsLoading ? (
@@ -437,14 +618,28 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                 ) : (
                   <>
                     <BookingTimeline
-                      bookings={allBookings}
+                      bookings={approvedBookings}
                       selectedRange={selectedRange}
+                      slotBooked={slotBooked}
                     />
 
+                    {/* Slot booked error (exclusive mode) */}
+                    {slotBooked && (
+                      <p className="text-xs text-red-500 mt-3 font-medium">
+                        ⛔ This time slot is already reserved. Please choose a different time.
+                      </p>
+                    )}
+
+                    {/* Generic slot error from validateStep */}
+                    {errors.slot && !slotBooked && (
+                      <p className={`${errorClass} mt-2`}>{errors.slot}</p>
+                    )}
+
+                    {/* Quick-pick free slots */}
                     {slots.length > 0 ? (
                       <div className="mt-4">
-                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-2">
-                          Click a slot to auto-fill the time
+                        <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+                          Quick-pick a free slot
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {slots.map((slot) => {
@@ -471,40 +666,22 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                         </div>
                       </div>
                     ) : (
-                      <p className="text-xs text-zinc-400 italic mt-3">
-                        {allBookings.length > 0
-                          ? 'No free slots remaining on this date.'
-                          : 'All day is available — choose any time below.'}
-                      </p>
+                      !slotBooked && (
+                        <p className="text-xs mt-3 font-medium">
+                          {approvedBookings.length > 0 ? (
+                            <span className="text-red-500">No completely free slots remaining on this date.</span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400">
+                              ✓ Fully available — pick any time above.
+                            </span>
+                          )}
+                        </p>
+                      )
                     )}
                   </>
                 )}
               </div>
             )}
-
-            {/* Manual time range */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className={labelClass}>Start Time *</label>
-                <input
-                  type="time"
-                  className={inputClass}
-                  value={form.startTime}
-                  onChange={set('startTime')}
-                />
-                {errors.startTime && <p className={errorClass}>{errors.startTime}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>End Time *</label>
-                <input
-                  type="time"
-                  className={inputClass}
-                  value={form.endTime}
-                  onChange={set('endTime')}
-                />
-                {errors.endTime && <p className={errorClass}>{errors.endTime}</p>}
-              </div>
-            </div>
           </motion.div>
         )}
 
@@ -617,7 +794,12 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
           <button
             type="button"
             onClick={nextStep}
-            className="flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors"
+            disabled={realStep === 2 && slotBooked}
+            className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-lg text-white transition-colors ${
+              realStep === 2 && slotBooked
+                ? 'bg-violet-300 dark:bg-violet-800 cursor-not-allowed opacity-60'
+                : 'bg-violet-600 hover:bg-violet-700'
+            }`}
           >
             Next <ChevronRight size={16} />
           </button>
@@ -625,7 +807,7 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
           <button
             type="button"
             onClick={handleFinalSubmit}
-            disabled={loading}
+            disabled={loading || submitting}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
           >
             {loading && <Loader2 size={15} className="animate-spin" />}
@@ -633,6 +815,25 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
           </button>
         )}
       </div>
+
+      {/* ── Duplicate booking interception modal ── */}
+      <ConfirmModal
+        open={!!duplicateBooking}
+        onClose={() => {
+          setDuplicateBooking(null);
+          // Clear time selection so user picks a fresh slot
+          setField('startTime', '');
+          setField('endTime', '');
+        }}
+        onConfirm={() => {
+          navigate(`/bookings/${duplicateBooking.id}/edit`);
+        }}
+        title="Existing Booking Found"
+        message={`You already have a ${duplicateBooking?.status?.toLowerCase()} booking for this resource on ${duplicateBooking?.date} (${duplicateBooking?.startTime}\u2013${duplicateBooking?.endTime}). Would you like to edit your existing booking instead?`}
+        confirmLabel="Edit Existing Booking"
+        cancelLabel="Choose Different Time"
+        confirmVariant="primary"
+      />
     </div>
   );
 }
