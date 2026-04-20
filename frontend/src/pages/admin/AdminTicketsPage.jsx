@@ -44,7 +44,7 @@ export default function AdminTicketsPage() {
       const res = await ticketService.getAllTickets({ status: statusFilter, priority: priorityFilter });
       const raw = res.data ?? res;
       setTickets(Array.isArray(raw) ? raw : []);
-    } catch (_) {
+    } catch  {
       setToast({ type: 'error', message: 'Failed to fetch tickets' });
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ export default function AdminTicketsPage() {
     try {
       const res = await commentService.getCommentsByTicket(ticket.id);
       setActiveComments(res.data || res);
-    } catch (_) {
+    } catch  {
       setToast({ type: 'error', message: 'Failed to load comments' });
     }
   };
@@ -72,7 +72,7 @@ export default function AdminTicketsPage() {
       const res = await commentService.getCommentsByTicket(commentModal.id);
       setActiveComments(res.data || res);
       showSuccess('Posted', 'Comment added and notification triggered');
-    } catch (_) {
+    } catch  {
       showError('Error', 'Failed to post comment');
     }
   };
@@ -83,7 +83,7 @@ export default function AdminTicketsPage() {
     try {
       await commentService.deleteComment(commentModal.id, cId);
       setActiveComments(prev => prev.filter(c => c.id !== cId));
-    } catch (_) {
+    } catch  {
       showError('Permission Denied', 'You can only delete your own comments.');
     }
   };
@@ -96,7 +96,7 @@ export default function AdminTicketsPage() {
       setToast({ type: 'success', message: 'Technician assigned' });
       setAssignModal(null);
       loadTickets();
-    } catch (_) { setToast({ type: 'error', message: 'Failed assignment' }); }
+    } catch  { setToast({ type: 'error', message: 'Failed assignment' }); }
   };
 
   const handleChangeStatus = async (e) => {
@@ -109,7 +109,7 @@ export default function AdminTicketsPage() {
       setToast({ type: 'success', message: 'Status updated' });
       setStatusModal(null);
       loadTickets();
-    } catch (err) { setToast({ type: 'error', message: 'Invalid status transition' }); }
+    } catch  { setToast({ type: 'error', message: 'Invalid status transition' }); }
   };
 
   const handleReject = async (e) => {
@@ -122,7 +122,7 @@ export default function AdminTicketsPage() {
       setToast({ type: 'success', message: 'Ticket rejected' });
       setRejectModal(null);
       loadTickets();
-    } catch (_) { setToast({ type: 'error', message: 'Failed to reject ticket' }); }
+    } catch { setToast({ type: 'error', message: 'Failed to reject ticket' }); }
   };
 
   return (

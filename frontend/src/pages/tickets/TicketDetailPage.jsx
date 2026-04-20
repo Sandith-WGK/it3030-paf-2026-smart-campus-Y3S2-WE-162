@@ -41,7 +41,7 @@ export default function TicketDetailPage() {
       
       const coms = commentsRes.data || commentsRes;
       setComments(Array.isArray(coms) ? coms : []);
-    } catch (_) {
+    } catch {
       setToast({ type: 'error', message: 'Failed to load ticket details' });
     } finally {
       setLoading(false);
@@ -57,7 +57,7 @@ export default function TicketDetailPage() {
       await commentService.addComment(id, newComment);
       setNewComment('');
       loadData(); // reload
-    } catch (_) {
+    } catch {
       setToast({ type: 'error', message: 'Failed to post comment' });
     } finally {
       setCommentLoading(false);
@@ -72,7 +72,7 @@ export default function TicketDetailPage() {
       await commentService.deleteComment(id, commentId);
       showSuccess('Deleted!', 'Your comment has been removed.');
       loadData();
-    } catch (_) {
+    } catch  {
       showError('Error', 'Failed to delete the comment.');
     }
   };
@@ -89,7 +89,7 @@ export default function TicketDetailPage() {
         await commentService.editComment(id, comment.id, content.trim());
         showSuccess('Updated!', 'Comment has been updated.');
         loadData();
-      } catch (_) {
+      } catch  {
         showError('Error', 'Failed to update the comment.');
       }
     }
