@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { ThemeContext } from './ThemeContext';
 import { useAuth } from './AuthContext';
 import { userService } from '../services/api/userService';
-import toast from 'react-hot-toast';
 
 export const ThemeProvider = ({ children }) => {
   const { user, isAuthenticated, updateUser } = useAuth();
@@ -28,12 +27,16 @@ export const ThemeProvider = ({ children }) => {
 
   // Sync internal state with AuthContext when the user object arrives
   useEffect(() => {
-    if (user?.preferences) {
-      setInternalPrefs(prev => ({
-        ...prev,
-        ...user.preferences
-      }));
-    }
+    if (!user?.preferences) return;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setInternalPrefs(prev => {
+      // Merge first
+      const next = { ...prev, ...user.preferences };
+      // Bail out if nothing changed (prevents cascading renders)
+      const unchanged = Object.keys(next).every((k) => Object.is(next[k], prev[k]));
+      return unchanged ? prev : next;
+    });
   }, [user]);
 
   // Sync theme to localStorage immediately when it changes

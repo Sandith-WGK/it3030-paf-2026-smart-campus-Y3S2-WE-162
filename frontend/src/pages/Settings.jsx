@@ -1,4 +1,5 @@
 import React from 'react';
+// eslint-disable-next-line no-unused-vars
 import { motion } from 'framer-motion';
 import { 
   Moon, Sun, Monitor, Bell, Volume2, Mail, 
@@ -7,7 +8,6 @@ import {
 import Layout from '../components/layout/Layout';
 import { useTheme } from '../context/useTheme';
 import { useAuth } from '../context/AuthContext';
-import toast from 'react-hot-toast';
 
 const SettingSection = ({ title, description, children }) => (
   <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-sm mb-6">
