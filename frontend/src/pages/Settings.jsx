@@ -69,7 +69,7 @@ const CategoryCard = ({ enabled, onClick, icon: Icon, label, description, color 
     >
       <div className="flex items-center gap-3">
         <div className={`p-2 rounded-xl ${enabled ? c.iconBg : 'bg-zinc-200 dark:bg-zinc-700'}`}>
-          <Icon size={18} className={enabled ? c.iconText : 'text-zinc-400'} />
+          {Icon && <Icon size={18} className={enabled ? c.iconText : 'text-zinc-400'} />}
         </div>
         <div>
           <p className="font-semibold text-sm">{label}</p>
