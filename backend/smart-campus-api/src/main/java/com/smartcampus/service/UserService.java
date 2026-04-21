@@ -63,6 +63,7 @@ public class UserService {
         if (userOpt.isPresent()) {
             User user = userOpt.get();
             boolean isLocalProvider = "LOCAL".equalsIgnoreCase(user.getProvider());
+            Role oldRole = user.getRole();
             
             // Re-verification logic if email changes
             if (StringUtils.hasText(email) && !email.equalsIgnoreCase(user.getEmail())) {
@@ -124,8 +125,38 @@ public class UserService {
             // Security Notification Trigger
             boolean emailChanged = StringUtils.hasText(email) && !email.equalsIgnoreCase(user.getEmail());
             boolean passwordChanged = StringUtils.hasText(password);
+            boolean roleChanged = role != null && role != oldRole;
 
             User savedUser = userRepository.save(user);
+
+            if (roleChanged) {
+                // Notify User of role change
+                notificationService.sendNotification(
+                    user.getId(),
+                    String.format("Security: Your account access level has been updated to %S.", role),
+                    NotifType.SECURITY_UPDATE,
+                    Severity.ALERT,
+                    id,
+                    "USER"
+                );
+
+                // If promoted to Admin, notify other admins for audit
+                if (role == Role.ADMIN) {
+                    List<User> admins = userRepository.findByRole(Role.ADMIN);
+                    for (User admin : admins) {
+                        if (!admin.getId().equals(id)) {
+                            notificationService.sendNotification(
+                                admin.getId(),
+                                String.format("Audit: %s has been promoted to ADMINISTRATOR role.", user.getName()),
+                                NotifType.SECURITY_UPDATE,
+                                Severity.ALERT,
+                                id,
+                                "USER"
+                            );
+                        }
+                    }
+                }
+            }
 
             if (emailChanged || passwordChanged) {
                 if (requireEmailReverification) {

@@ -122,6 +122,7 @@ const Navbar = ({ leftSlot = null }) => {
               <NotificationPanel 
                 notifications={notifications}
                 onMarkRead={handleMarkRead}
+                onMarkAllRead={markAllAsRead}
                 onDelete={handleDeleteNotif}
                 onDeleteAll={deleteAll}
                 userRole={user?.role}

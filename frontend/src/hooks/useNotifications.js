@@ -174,5 +174,41 @@ export const useNotifications = (userId, token) => {
     }
   };
 
+  const pulseInterval = useRef(null);
+
+  useEffect(() => {
+    const unreadCount = notifications.filter(n => !n.isRead).length;
+    
+    // Stop pulse if no unread or user returns to tab
+    const stopPulse = () => {
+      if (pulseInterval.current) {
+        clearInterval(pulseInterval.current);
+        pulseInterval.current = null;
+        document.title = 'Smart Campus';
+      }
+    };
+
+    if (unreadCount > 0 && document.hidden) {
+      if (!pulseInterval.current) {
+        let showCount = true;
+        pulseInterval.current = setInterval(() => {
+          document.title = showCount ? `(${unreadCount}) New Notifications` : 'Smart Campus';
+          showCount = !showCount;
+        }, 1500);
+      }
+    } else {
+      stopPulse();
+    }
+
+    const handleFocus = () => stopPulse();
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
+    };
+  }, [notifications]);
+
   return { notifications, loading, connected, markAsRead, markAllAsRead, deleteNotification, deleteAll, refresh: fetchInitialNotifications };
-};
+}

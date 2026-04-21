@@ -18,9 +18,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.stream.Collectors;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import org.springframework.scheduling.annotation.Scheduled;
 
 @Service
 @RequiredArgsConstructor
@@ -178,5 +180,21 @@ public class NotificationService {
      */
     public long getUnreadCount(String userId) {
         return notificationRepository.countByUserIdAndIsReadFalseAndIsArchivedFalse(userId);
+    }
+
+    /**
+     * Automated Maintenance Task: Cleans up notifications older than 30 days.
+     * Runs every 24 hours at midnight.
+     */
+    @Scheduled(cron = "0 0 0 * * *")
+    public void cleanupOldNotifications() {
+        Instant thirtyDaysAgo = Instant.now().minus(30, ChronoUnit.DAYS);
+        log.info("System: Starting Automated Notification Cleanup Task...");
+        try {
+            notificationRepository.deleteByCreatedAtBefore(thirtyDaysAgo);
+            log.info("System: Successfully cleaned up notifications older than 30 days.");
+        } catch (Exception e) {
+            log.error("System: Automated Cleanup failed: {}", e.getMessage());
+        }
     }
 }

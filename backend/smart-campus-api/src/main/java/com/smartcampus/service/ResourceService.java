@@ -10,7 +10,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalTime;
+import java.time.LocalDate;
 import java.util.List;
+import com.smartcampus.model.BookingStatus;
+import com.smartcampus.model.NotifType;
+import com.smartcampus.model.Severity;
+import com.smartcampus.repository.BookingRepository;
+import com.smartcampus.model.Booking;
 
 /**
  * Service layer for Resource management (Module A - Facilities & Assets Catalogue).
@@ -22,6 +28,8 @@ import java.util.List;
 public class ResourceService {
 
     private final ResourceRepository resourceRepository;
+    private final BookingRepository bookingRepository;
+    private final NotificationService notificationService;
 
     /**
      * Get all resources with optional filters
@@ -117,6 +125,7 @@ public class ResourceService {
         validateResource(updatedResource);
 
         // Update fields
+        ResourceStatus oldStatus = existingResource.getStatus();
         existingResource.setName(updatedResource.getName());
         existingResource.setType(updatedResource.getType());
         existingResource.setCapacity(updatedResource.getCapacity());
@@ -126,8 +135,15 @@ public class ResourceService {
         existingResource.setAvailabilityEnd(updatedResource.getAvailabilityEnd());
         existingResource.setDescription(updatedResource.getDescription());
 
+        Resource saved = resourceRepository.save(existingResource);
+        
+        // Notify if status changed away from ACTIVE
+        if (oldStatus == ResourceStatus.ACTIVE && saved.getStatus() != ResourceStatus.ACTIVE) {
+            notifyAffectedUsers(saved);
+        }
+
         log.info("Updating resource: {}", id);
-        return resourceRepository.save(existingResource);
+        return saved;
     }
 
     /**
@@ -139,9 +155,36 @@ public class ResourceService {
      */
     public Resource updateResourceStatus(String id, ResourceStatus status) {
         Resource resource = getResourceById(id);
+        ResourceStatus oldStatus = resource.getStatus();
         resource.setStatus(status);
+        
+        Resource saved = resourceRepository.save(resource);
+        
+        // Notify if status changed away from ACTIVE
+        if (oldStatus == ResourceStatus.ACTIVE && status != ResourceStatus.ACTIVE) {
+            notifyAffectedUsers(saved);
+        }
+        
         log.info("Updating resource status: {} -> {}", id, status);
-        return resourceRepository.save(resource);
+        return saved;
+    }
+
+    private void notifyAffectedUsers(Resource resource) {
+        List<BookingStatus> activeStatuses = List.of(BookingStatus.APPROVED, BookingStatus.PENDING);
+        List<Booking> affectedBookings = bookingRepository.findByResourceIdAndStatusInAndDateGreaterThanEqual(
+                resource.getId(), activeStatuses, LocalDate.now());
+
+        for (Booking booking : affectedBookings) {
+            notificationService.sendNotification(
+                    booking.getUserId(),
+                    String.format("Urgent: %s is now %s. Your booking on %s may be affected. Please check your dashboard.",
+                            resource.getName(), resource.getStatus(), booking.getDate()),
+                    NotifType.RESOURCE_UPDATE,
+                    Severity.ALERT,
+                    resource.getId(),
+                    "RESOURCE"
+            );
+        }
     }
 
     /**
