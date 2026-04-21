@@ -125,11 +125,11 @@ export default function VerifyBooking() {
 }
 
 /** Small detail row used in the success card */
-function DetailRow({ icon: Icon, label, value, sub }) {
+function DetailRow({ icon: IconComponent, label, value, sub }) {
   return (
     <div className="flex items-start gap-3">
       <div className="mt-0.5 rounded-lg bg-green-50 dark:bg-green-500/10 p-2">
-        <Icon size={16} className="text-green-600 dark:text-green-400" />
+        <IconComponent size={16} className="text-green-600 dark:text-green-400" />
       </div>
       <div>
         <p className="text-xs text-zinc-400 dark:text-zinc-500">{label}</p>
