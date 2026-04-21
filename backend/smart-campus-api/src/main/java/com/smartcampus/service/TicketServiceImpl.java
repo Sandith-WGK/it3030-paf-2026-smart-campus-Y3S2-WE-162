@@ -17,12 +17,18 @@ import java.time.Instant;
 import java.util.List;
 import java.util.stream.Collectors;
 import com.smartcampus.service.NotificationService;
+import com.smartcampus.repository.UserRepository;
+import com.smartcampus.model.User;
+import com.smartcampus.model.Role;
+import com.smartcampus.model.NotifType;
+import com.smartcampus.model.Severity;
 
 @Service
 @RequiredArgsConstructor
 public class TicketServiceImpl implements TicketService {
 
     private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
     private final AttachmentService attachmentService;
     private final NotificationService notificationService;
 
@@ -43,11 +49,28 @@ public class TicketServiceImpl implements TicketService {
         notificationService.sendNotification(
             reporterId,
             "Your maintenance ticket has been created and is awaiting review.",
-            com.smartcampus.model.NotifType.TICKET_UPDATED,
-            com.smartcampus.model.Severity.INFO,
+            NotifType.TICKET_UPDATED,
+            Severity.INFO,
             saved.getId(),
             "TICKET"
         );
+
+        // Notify all admins about the new ticket
+        List<User> admins = userRepository.findByRole(Role.ADMIN);
+        User reporter = userRepository.findById(reporterId).orElse(null);
+        String reporterName = (reporter != null) ? reporter.getName() : "A user";
+        
+        for (User admin : admins) {
+            notificationService.sendNotification(
+                admin.getId(),
+                String.format("New Maintenance Ticket: %s has reported an issue regarding %s.", 
+                              reporterName, saved.getCategory()),
+                NotifType.TICKET_CREATED,
+                Severity.INFO,
+                saved.getId(),
+                "TICKET"
+            );
+        }
 
         return mapToResponse(saved);
     }
