@@ -1,5 +1,6 @@
 package com.smartcampus.service;
 
+import com.smartcampus.repository.BookingRepository;
 import com.smartcampus.exception.ResourceNotFoundException;
 import com.smartcampus.model.Resource;
 import com.smartcampus.model.ResourceStatus;
@@ -8,6 +9,12 @@ import com.smartcampus.repository.ResourceRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+
+import com.smartcampus.model.Booking;
+import com.smartcampus.model.BookingStatus;
+import com.smartcampus.model.NotifType;
+import com.smartcampus.model.Severity;
+import java.time.LocalDate;
 
 import java.time.LocalTime;
 import java.util.ArrayList;
