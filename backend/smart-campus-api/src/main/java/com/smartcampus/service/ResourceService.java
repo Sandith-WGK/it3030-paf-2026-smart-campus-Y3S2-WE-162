@@ -1,5 +1,6 @@
 package com.smartcampus.service;
 
+import com.smartcampus.repository.BookingRepository;
 import com.smartcampus.exception.ResourceNotFoundException;
 import com.smartcampus.model.Resource;
 import com.smartcampus.model.ResourceStatus;
@@ -9,14 +10,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalTime;
-import java.time.LocalDate;
-import java.util.List;
+import com.smartcampus.model.Booking;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.model.NotifType;
 import com.smartcampus.model.Severity;
-import com.smartcampus.repository.BookingRepository;
-import com.smartcampus.model.Booking;
+import java.time.LocalDate;
+
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Service layer for Resource management (Module A - Facilities & Assets Catalogue).
@@ -88,9 +92,21 @@ public class ResourceService {
      * Create a new resource with validation
      * @param resource Resource object to create
      * @return Created resource object
-     * @throws IllegalArgumentException if validation fails
+     * @throws IllegalArgumentException if validation fails or duplicate name
      */
     public Resource createResource(Resource resource) {
+        // Trim name first
+        if (resource.getName() != null) {
+            resource.setName(resource.getName().trim());
+        }
+        
+        // ✅ UNIQUE NAME VALIDATION - Check if name already exists
+        if (resourceRepository.existsByName(resource.getName())) {
+            throw new IllegalArgumentException(
+                "Resource with name '" + resource.getName() + "' already exists. Please use a different name."
+            );
+        }
+        
         validateResource(resource);
         
         // Set default availability times if not provided
@@ -116,10 +132,26 @@ public class ResourceService {
      * @param updatedResource Updated resource object
      * @return Updated resource object
      * @throws ResourceNotFoundException if resource not found
-     * @throws IllegalArgumentException if validation fails
+     * @throws IllegalArgumentException if validation fails or duplicate name
      */
     public Resource updateResource(String id, Resource updatedResource) {
         Resource existingResource = getResourceById(id);
+
+        // Trim name if present
+        if (updatedResource.getName() != null) {
+            updatedResource.setName(updatedResource.getName().trim());
+        }
+
+        // ✅ UNIQUE NAME VALIDATION - Check if name is taken by another resource
+        // First check if the name has actually changed
+        if (!existingResource.getName().equals(updatedResource.getName())) {
+            // Only check uniqueness if name is being changed
+            if (resourceRepository.existsByName(updatedResource.getName())) {
+                throw new IllegalArgumentException(
+                    "Resource with name '" + updatedResource.getName() + "' already exists. Please use a different name."
+                );
+            }
+        }
 
         // Validate the updated resource
         validateResource(updatedResource);
