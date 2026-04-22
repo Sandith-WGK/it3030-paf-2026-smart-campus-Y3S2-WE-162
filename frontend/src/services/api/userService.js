@@ -39,5 +39,10 @@ export const userService = {
   getUserActivity: async (id) => {
     const response = await api.get(`/users/${id}/activity`);
     return response.data;
+  },
+
+  getUserActivity: async (id) => {
+    const response = await api.get(`/users/${id}/activity`);
+    return response.data;
   }
 };

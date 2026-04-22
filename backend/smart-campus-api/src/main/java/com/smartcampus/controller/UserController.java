@@ -2,6 +2,7 @@ package com.smartcampus.controller;
 
 import com.smartcampus.model.Role;
 import com.smartcampus.model.User;
+import com.smartcampus.model.UserActivity;
 import com.smartcampus.security.UserPrincipal;
 import com.smartcampus.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,11 +39,11 @@ public class UserController {
         return ResponseEntity.ok(userService.getUserById(id));
     }
 
-    public record CreateUserRequest(String email, String name, Role role) {}
+    public record CreateUserRequest(String email, String name, Role role, String password) {}
 
     @PostMapping
     public ResponseEntity<User> createUser(@RequestBody CreateUserRequest request) {
-        User created = userService.createUser(request.email(), request.name(), request.role());
+        User created = userService.createUser(request.email(), request.name(), request.role(), request.password());
         return ResponseEntity.ok(created);
     }
 
@@ -87,6 +88,12 @@ public class UserController {
             @PathVariable String id,
             @RequestBody com.smartcampus.model.NotificationPreference request) {
         return ResponseEntity.ok(userService.updateNotificationPreferences(id, request));
+    }
+
+    @GetMapping("/{id}/activity")
+    @PreAuthorize("hasRole('ADMIN') or #id == principal.userId")
+    public ResponseEntity<List<UserActivity>> getUserActivity(@PathVariable String id) {
+        return ResponseEntity.ok(userService.getUserActivity(id));
     }
 
     @DeleteMapping("/{id}")
