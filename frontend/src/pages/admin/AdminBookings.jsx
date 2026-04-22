@@ -24,6 +24,23 @@ import { SkeletonGrid } from '../../components/common/Skeleton';
 import bookingService from '../../services/api/bookingService';
 import BookingAnalyticsPanel from '../../components/booking/BookingAnalyticsPanel';
 
+const PAGE_SIZE = 20;
+const BUSINESS_TIMEZONE = 'Asia/Colombo';
+
+function todayInTimezone(timeZone) {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value;
+  const day = parts.find((p) => p.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
+}
+
 // Pending bookings always surface first, then sort by date descending
 function sortBookings(list) {
   return [...list].sort((a, b) => {
@@ -41,6 +58,8 @@ export default function AdminBookings() {
   const [filters, setFilters] = useState({});
   const [toast, setToast] = useState(null);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
 
   // Single reject/approve
   const [rejectTarget, setRejectTarget] = useState(null);
@@ -60,18 +79,35 @@ export default function AdminBookings() {
     setLoading(true);
     setSelected(new Set());
     bookingService
-      .getAllBookings(filters)
+      .getAllBookings({ ...filters, page, size: PAGE_SIZE })
       .then((res) => {
         const raw = res.data?.data ?? res.data;
-        setBookings(Array.isArray(raw) ? sortBookings(raw) : []);
+        const list = Array.isArray(raw) ? raw : [];
+        setBookings(sortBookings(list));
+        // Backend currently returns a plain list; infer next page availability.
+        setHasMore(list.length === PAGE_SIZE);
       })
-      .catch(() => setToast({ type: 'error', message: 'Failed to load bookings' }))
+      .catch(() => {
+        setToast({ type: 'error', message: 'Failed to load bookings' });
+        setHasMore(false);
+      })
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [filters, page]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    // Keep only IDs that are still visible and pending on the current page.
+    const visiblePendingIds = new Set(
+      bookings.filter((b) => b.status === 'PENDING').map((b) => b.id),
+    );
+    setSelected((prev) => {
+      const next = new Set([...prev].filter((id) => visiblePendingIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [bookings]);
 
   // ── Animate a booking row out then reload ─────────────────────────────────────
   const animateAndReload = (ids) => {
@@ -116,7 +152,12 @@ export default function AdminBookings() {
   // ── Bulk approve ──────────────────────────────────────────────────────────────
   const handleBulkApprove = async () => {
     setBulkLoading(true);
-    const ids = [...selected];
+    const ids = selectedPendingIds;
+    if (ids.length === 0) {
+      setBulkLoading(false);
+      setBulkApproveOpen(false);
+      return;
+    }
     try {
       const results = await Promise.allSettled(ids.map((id) => bookingService.approveBooking(id)));
       const succeeded = results.filter((r) => r.status === 'fulfilled').length;
@@ -144,8 +185,12 @@ export default function AdminBookings() {
 
   // ── Selection helpers ─────────────────────────────────────────────────────────
   const pendingBookings = bookings.filter((b) => b.status === 'PENDING');
+  const selectedPendingIds = pendingBookings
+    .filter((b) => selected.has(b.id))
+    .map((b) => b.id);
+  const selectedPendingCount = selectedPendingIds.length;
   const allPendingSelected =
-    pendingBookings.length > 0 && pendingBookings.every((b) => selected.has(b.id));
+    pendingBookings.length > 0 && selectedPendingCount === pendingBookings.length;
 
   const toggleSelect = (id) => {
     setSelected((prev) => {
@@ -166,7 +211,7 @@ export default function AdminBookings() {
   // ── Stats ─────────────────────────────────────────────────────────────────────
   const pendingCount = bookings.filter((b) => b.status === 'PENDING').length;
   const approvedCount = bookings.filter((b) => b.status === 'APPROVED').length;
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayInTimezone(BUSINESS_TIMEZONE);
   const todayCount = bookings.filter((b) => b.date === today).length;
 
   return (
@@ -177,6 +222,9 @@ export default function AdminBookings() {
           <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Manage Bookings</h2>
           <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
             Review, approve or reject booking requests
+          </p>
+          <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">
+            Showing page {page + 1} (up to {PAGE_SIZE} bookings per page)
           </p>
         </div>
         <button
@@ -243,12 +291,18 @@ export default function AdminBookings() {
 
       {/* Filters */}
       <div className="mb-5">
-        <BookingFilters filters={filters} onChange={setFilters} />
+        <BookingFilters
+          filters={filters}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            setPage(0);
+          }}
+        />
       </div>
 
       {/* Bulk approve toolbar */}
       <AnimatePresence>
-        {selected.size > 0 && (
+        {selectedPendingCount > 0 && (
           <Motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -256,7 +310,7 @@ export default function AdminBookings() {
             className="flex items-center justify-between rounded-xl border border-violet-200 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-500/10 px-4 py-3 mb-4"
           >
             <p className="text-sm font-medium text-violet-800 dark:text-violet-200">
-              {selected.size} booking{selected.size > 1 ? 's' : ''} selected
+              {selectedPendingCount} booking{selectedPendingCount > 1 ? 's' : ''} selected
             </p>
             <div className="flex items-center gap-3">
               <button
@@ -405,6 +459,33 @@ export default function AdminBookings() {
         </div>
       )}
 
+      {/* Pagination controls */}
+      {!loading && bookings.length > 0 && (
+        <div className="mt-5 flex items-center justify-between">
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Page {page + 1}
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Previous
+            </button>
+            <button
+              type="button"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={!hasMore}
+              className="px-3 py-1.5 text-xs rounded-lg border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-300 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Single approve confirmation */}
       <ConfirmModal
         open={!!approveTarget}
@@ -423,8 +504,8 @@ export default function AdminBookings() {
         onClose={() => setBulkApproveOpen(false)}
         onConfirm={handleBulkApprove}
         title="Bulk Approve"
-        message={`Approve all ${selected.size} selected pending bookings?`}
-        confirmLabel={bulkLoading ? 'Approving…' : `Approve ${selected.size}`}
+        message={`Approve all ${selectedPendingCount} selected pending bookings?`}
+        confirmLabel={bulkLoading ? 'Approving…' : `Approve ${selectedPendingCount}`}
         confirmVariant="primary"
         loading={bulkLoading}
       />
