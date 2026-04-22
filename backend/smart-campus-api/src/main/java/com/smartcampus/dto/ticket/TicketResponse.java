@@ -32,4 +32,5 @@ public class TicketResponse {
     private String rejectionReason;
     private Instant createdAt;
     private Instant resolvedAt;
+    private Instant firstResponseAt;
 }

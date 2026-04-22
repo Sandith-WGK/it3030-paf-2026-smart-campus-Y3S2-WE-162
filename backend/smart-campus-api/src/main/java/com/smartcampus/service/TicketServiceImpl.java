@@ -167,6 +167,13 @@ public class TicketServiceImpl implements TicketService {
             }
         }
 
+        // Set firstResponseAt if this is the first response (status change from OPEN)
+        if (currentStatus == TicketStatus.OPEN && newStatus != TicketStatus.OPEN) {
+            if (ticket.getFirstResponseAt() == null) {
+                ticket.setFirstResponseAt(Instant.now());
+            }
+        }
+
         Ticket saved = ticketRepository.save(ticket);
 
         // Notify the reporter about status change
@@ -190,6 +197,12 @@ public class TicketServiceImpl implements TicketService {
     public TicketResponse assignTechnician(String ticketId, String technicianId) {
         Ticket ticket = getTicketEntity(ticketId);
         ticket.setAssigneeId(technicianId);
+
+        // Assigning a technician also counts as a first response
+        if (ticket.getFirstResponseAt() == null) {
+            ticket.setFirstResponseAt(Instant.now());
+        }
+
         Ticket saved = ticketRepository.save(ticket);
 
         // Notify the technician
@@ -262,6 +275,7 @@ public class TicketServiceImpl implements TicketService {
                 .rejectionReason(ticket.getRejectionReason())
                 .createdAt(ticket.getCreatedAt())
                 .resolvedAt(ticket.getResolvedAt())
+                .firstResponseAt(ticket.getFirstResponseAt())
                 .build();
     }
 }

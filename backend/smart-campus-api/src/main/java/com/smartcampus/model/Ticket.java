@@ -59,5 +59,7 @@ public class Ticket {
     @CreatedDate
     private Instant createdAt;
 
-    private Instant resolvedAt;       
+    private Instant resolvedAt; 
+    
+    private Instant firstResponseAt;
 }
