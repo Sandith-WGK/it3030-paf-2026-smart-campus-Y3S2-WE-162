@@ -104,7 +104,7 @@ export default function TicketDetailPage() {
   }
 
   return (
-    <Layout title={`Ticket #${ticket.id?.substring(0,6)}`}>
+    <Layout title={`Ticket #${ticket.ticketCode || ticket.id?.substring(0,6)}`}>
       <div className="max-w-5xl mx-auto space-y-8 pb-12">
         
         {/* Header Bar */}

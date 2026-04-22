@@ -206,7 +206,7 @@ export default function AdminTicketsPage() {
                       </div>
                       <div className="text-xs text-zinc-400 font-mono mt-1 flex items-center gap-1">
                         <span className="w-1.5 h-1.5 rounded-full bg-zinc-300 dark:bg-zinc-600"></span>
-                        #{t.id.substring(0, 8)}
+                         #{t.ticketCode || t.id.substring(0, 8)}
                       </div>
                     </td>
                     <td className="px-6 py-4">

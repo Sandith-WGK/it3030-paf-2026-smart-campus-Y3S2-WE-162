@@ -25,6 +25,8 @@ public class Ticket {
     @Id
     private String id;
 
+    private String ticketCode;
+
     private String resourceId;         
 
     @NotBlank(message = "Reporter ID is required")

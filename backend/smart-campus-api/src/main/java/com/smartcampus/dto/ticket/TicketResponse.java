@@ -18,6 +18,7 @@ import java.util.List;
 public class TicketResponse {
 
     private String id;
+    private String ticketCode;
     private String resourceId;
     private String reporterId;
     private String assigneeId;
