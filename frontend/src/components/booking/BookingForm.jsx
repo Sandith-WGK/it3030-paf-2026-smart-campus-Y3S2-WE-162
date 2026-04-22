@@ -130,6 +130,13 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
         allowedTypes: ['ROOM', 'EQUIPMENT'],
         priority: 'STANDARD',
       },
+      UNDERGRADUATE: {
+        maxHours: 2,
+        horizonDays: 14,
+        activeLimit: 3,
+        allowedTypes: ['ROOM', 'EQUIPMENT'],
+        priority: 'STANDARD',
+      },
       INSTRUCTOR: {
         maxHours: 6,
         horizonDays: 30,

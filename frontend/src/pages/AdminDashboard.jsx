@@ -17,6 +17,14 @@ import Layout from '../components/layout/Layout';
 import { getRoleLabel } from '../utils/auth';
 
 const COLORS = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981'];
+const ROLE_OPTIONS = [
+  { value: 'UNDERGRADUATE_STUDENT', label: 'Undergraduate Student' },
+  { value: 'UNDERGRADUATE', label: 'Undergraduate (Legacy)' },
+  { value: 'INSTRUCTOR', label: 'Instructor' },
+  { value: 'LECTURER', label: 'Lecturer' },
+  { value: 'MANAGER', label: 'Manager' },
+  { value: 'TECHNICIAN', label: 'Technician' },
+];
 
 export default function AdminDashboard() {
   const { user, login } = useAuth();
@@ -451,11 +459,11 @@ export default function AdminDashboard() {
                 className="py-2 px-4 rounded-xl border border-zinc-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100"
               >
                 <option value="ALL">All Roles</option>
-                <option value="UNDERGRADUATE_STUDENT">Undergraduate Student</option>
-                <option value="INSTRUCTOR">Instructor</option>
-                <option value="LECTURER">Lecturer</option>
-                <option value="MANAGER">Manager</option>
-                <option value="TECHNICIAN">Technician</option>
+                {ROLE_OPTIONS.map((roleOpt) => (
+                  <option key={roleOpt.value} value={roleOpt.value}>
+                    {roleOpt.label}
+                  </option>
+                ))}
               </select>
             </div>
             
@@ -605,11 +613,11 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Assign Role</label>
                   <select value={newUserData.role} onChange={e => setNewUserData({...newUserData, role: e.target.value})} className="w-full p-2.5 rounded-xl border border-zinc-200 bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700">
-                    <option value="UNDERGRADUATE_STUDENT">Undergraduate Student</option>
-                    <option value="INSTRUCTOR">Instructor</option>
-                    <option value="LECTURER">Lecturer</option>
-                    <option value="MANAGER">Manager</option>
-                    <option value="TECHNICIAN">Technician</option>
+                    {ROLE_OPTIONS.map((roleOpt) => (
+                      <option key={roleOpt.value} value={roleOpt.value}>
+                        {roleOpt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -740,11 +748,11 @@ export default function AdminDashboard() {
                       onChange={e => setEditingUser({...editingUser, role: e.target.value})} 
                       className="w-full p-3 rounded-xl border border-zinc-200 bg-zinc-50 focus:bg-white focus:ring-2 focus:ring-violet-500 outline-none dark:bg-zinc-950 dark:border-zinc-700 transition-all text-sm"
                     >
-                      <option value="UNDERGRADUATE_STUDENT">Undergraduate Student</option>
-                      <option value="INSTRUCTOR">Instructor</option>
-                      <option value="LECTURER">Lecturer</option>
-                      <option value="MANAGER">Manager</option>
-                      <option value="TECHNICIAN">Technician</option>
+                      {ROLE_OPTIONS.map((roleOpt) => (
+                        <option key={roleOpt.value} value={roleOpt.value}>
+                          {roleOpt.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
 

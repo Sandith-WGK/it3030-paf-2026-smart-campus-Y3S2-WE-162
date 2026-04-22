@@ -29,6 +29,7 @@ export function isAdmin() {
 
 export const ROLE_LABELS = {
   UNDERGRADUATE_STUDENT: 'Undergraduate Student',
+  UNDERGRADUATE: 'Undergraduate Student',
   INSTRUCTOR: 'Instructor',
   LECTURER: 'Lecturer',
   MANAGER: 'Manager',

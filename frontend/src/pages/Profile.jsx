@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { userService } from '../services/api/userService';
 import Layout from '../components/layout/Layout';
+import { getRoleLabel } from '../utils/auth';
 
 const Profile = () => {
   const { user, login, updateUserLocal } = useAuth();
@@ -232,7 +233,7 @@ const Profile = () => {
                     <div className="w-full pt-6 border-t border-zinc-100 dark:border-zinc-800 space-y-3">
                       <div className="flex items-center gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                         <ShieldCheck size={18} className="text-violet-500" />
-                        <span>Role: <span className="text-violet-600 dark:text-violet-400">{user?.role}</span></span>
+                        <span>Role: <span className="text-violet-600 dark:text-violet-400">{getRoleLabel(user?.role)}</span></span>
                       </div>
                       <div className="flex items-center gap-3 text-sm font-medium text-zinc-600 dark:text-zinc-400">
                         {isGoogleUser ? (

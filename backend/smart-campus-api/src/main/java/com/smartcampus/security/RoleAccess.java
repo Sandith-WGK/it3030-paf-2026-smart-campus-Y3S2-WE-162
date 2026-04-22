@@ -14,59 +14,60 @@ public final class RoleAccess {
     private RoleAccess() {}
 
     public static final Set<Role> REQUESTER_ROLES = EnumSet.of(
-            Role.UNDERGRADUATE_STUDENT, Role.INSTRUCTOR, Role.LECTURER
+            Role.UNDERGRADUATE_STUDENT, Role.UNDERGRADUATE, Role.INSTRUCTOR, Role.LECTURER, Role.USER, Role.STUDENT
     );
 
     public static boolean isManager(Role role) {
-        return role == Role.MANAGER;
+        return role == Role.MANAGER || role == Role.ADMIN;
     }
 
     public static boolean requiresTwoFactor(Role role) {
-        return role == Role.MANAGER || role == Role.TECHNICIAN;
+        return role == Role.MANAGER || role == Role.ADMIN || role == Role.TECHNICIAN;
     }
 
     public static boolean canUpdateTicketStatus(Role role) {
-        return role == Role.MANAGER || role == Role.TECHNICIAN;
+        return role == Role.MANAGER || role == Role.ADMIN || role == Role.TECHNICIAN;
     }
 
     public static boolean canBookResource(Role role, ResourceType resourceType) {
         return switch (role) {
-            case UNDERGRADUATE_STUDENT -> resourceType == ResourceType.ROOM || resourceType == ResourceType.EQUIPMENT;
+            case UNDERGRADUATE_STUDENT, UNDERGRADUATE, USER, STUDENT ->
+                    resourceType == ResourceType.ROOM || resourceType == ResourceType.EQUIPMENT;
             case INSTRUCTOR -> resourceType == ResourceType.ROOM
                     || resourceType == ResourceType.HALL
                     || resourceType == ResourceType.LAB
                     || resourceType == ResourceType.EQUIPMENT;
-            case LECTURER, MANAGER -> true;
+            case LECTURER, MANAGER, ADMIN -> true;
             case TECHNICIAN -> false;
         };
     }
 
     public static long maxBookingHours(Role role) {
         return switch (role) {
-            case UNDERGRADUATE_STUDENT -> 2;
+            case UNDERGRADUATE_STUDENT, UNDERGRADUATE, USER, STUDENT -> 2;
             case INSTRUCTOR -> 6;
             case LECTURER -> 8;
-            case MANAGER -> 12;
+            case MANAGER, ADMIN -> 12;
             case TECHNICIAN -> 0;
         };
     }
 
     public static long bookingHorizonDays(Role role) {
         return switch (role) {
-            case UNDERGRADUATE_STUDENT -> 14;
+            case UNDERGRADUATE_STUDENT, UNDERGRADUATE, USER, STUDENT -> 14;
             case INSTRUCTOR -> 30;
             case LECTURER -> 45;
-            case MANAGER -> 90;
+            case MANAGER, ADMIN -> 90;
             case TECHNICIAN -> 0;
         };
     }
 
     public static int maxActiveFutureBookings(Role role) {
         return switch (role) {
-            case UNDERGRADUATE_STUDENT -> 3;
+            case UNDERGRADUATE_STUDENT, UNDERGRADUATE, USER, STUDENT -> 3;
             case INSTRUCTOR -> 10;
             case LECTURER -> 15;
-            case MANAGER -> Integer.MAX_VALUE;
+            case MANAGER, ADMIN -> Integer.MAX_VALUE;
             case TECHNICIAN -> 0;
         };
     }
@@ -75,8 +76,8 @@ public final class RoleAccess {
         int roleScore = switch (user.getRole()) {
             case LECTURER -> 300;
             case INSTRUCTOR -> 200;
-            case UNDERGRADUATE_STUDENT -> 100;
-            case MANAGER -> 1000;
+            case UNDERGRADUATE_STUDENT, UNDERGRADUATE, USER, STUDENT -> 100;
+            case MANAGER, ADMIN -> 1000;
             case TECHNICIAN -> 0;
         };
         int resourceBonus = switch (resourceType) {

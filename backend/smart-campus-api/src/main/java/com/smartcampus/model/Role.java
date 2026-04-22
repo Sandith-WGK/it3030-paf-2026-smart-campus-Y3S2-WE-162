@@ -7,6 +7,7 @@ public enum Role {
     MANAGER,
     TECHNICIAN,
     // Legacy compatibility roles used in older datasets/clients
+    UNDERGRADUATE,
     USER,
     ADMIN,
     STUDENT
