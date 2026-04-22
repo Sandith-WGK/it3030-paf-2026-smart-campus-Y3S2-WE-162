@@ -25,6 +25,14 @@ import bookingService from '../../services/api/bookingService';
 import { isAdmin } from '../../utils/auth';
 import { generateBookingPDF } from '../../utils/pdfExport';
 
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export default function BookingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -103,7 +111,7 @@ export default function BookingDetail() {
 
   if (!booking) return null;
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocalIso();
   const canEdit = booking.status === 'PENDING' && booking.date >= today;
   const canCancel = booking.status === 'APPROVED';
   const canDelete =

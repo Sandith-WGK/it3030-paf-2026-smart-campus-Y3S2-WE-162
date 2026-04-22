@@ -61,6 +61,32 @@ function generateTimeOptions(start = '07:00', end = '22:00') {
   return opts;
 }
 
+function generateEndTimeOptions(start = '07:00', end = '22:00') {
+  const opts = [];
+  let cur = timeToMinutes(start);
+  const endMin = timeToMinutes(end);
+  while (cur <= endMin) {
+    opts.push(minutesToTime(cur));
+    cur += 30;
+  }
+  return opts;
+}
+
+function getTodayLocalIso() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getCurrentLocalTimeHHmm() {
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const mins = String(now.getMinutes()).padStart(2, '0');
+  return `${hours}:${mins}`;
+}
+
 // ─── Shared styles ─────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -330,16 +356,17 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
       if (!form.endTime) e.endTime = 'End time is required';
       if (form.startTime && form.endTime && form.startTime >= form.endTime)
         e.endTime = 'End time must be after start time';
+      if (
+        form.startTime &&
+        form.endTime &&
+        timeToMinutes(form.endTime) - timeToMinutes(form.startTime) < 30
+      ) {
+        e.endTime = 'Booking duration must be at least 30 minutes';
+      }
       // Past-time guard: if the selected date is today, start time must be in the future
       if (form.date && form.startTime) {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const day = String(now.getDate()).padStart(2, '0');
-        const nowDate = `${year}-${month}-${day}`;
-        const hours = String(now.getHours()).padStart(2, '0');
-        const mins = String(now.getMinutes()).padStart(2, '0');
-        const nowTime = `${hours}:${mins}`;
+        const nowDate = getTodayLocalIso();
+        const nowTime = getCurrentLocalTimeHHmm();
         if (form.date === nowDate && form.startTime <= nowTime)
           e.startTime = 'Start time must be in the future for today.';
         if (form.date < nowDate)
@@ -387,6 +414,11 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
   const [pendingWarningOpen, setPendingWarningOpen] = useState(false);
   const [pendingWarningAcknowledged, setPendingWarningAcknowledged] = useState(false);
 
+  // Reset acknowledgment when slot context changes, so each contested slot is reconfirmed.
+  useEffect(() => {
+    setPendingWarningAcknowledged(false);
+  }, [activeResourceId, form.date, form.startTime, form.endTime]);
+
   const handleFinalSubmit = (forceSubmit = false) => {
     if (!validateStep(3)) return;
     if (submitting) return; // guard against double-tap
@@ -408,7 +440,8 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
     Promise.resolve(onSubmit(payload)).finally(() => setSubmitting(false));
   };
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = getTodayLocalIso();
+  const nowTime = getCurrentLocalTimeHHmm();
   const selectedRange =
     form.startTime && form.endTime ? { start: form.startTime, end: form.endTime } : null;
 
@@ -422,8 +455,17 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
         setCalendarOpen(false);
       }
     };
-    if (calendarOpen) document.addEventListener('mousedown', handleOutside);
-    return () => document.removeEventListener('mousedown', handleOutside);
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setCalendarOpen(false);
+    };
+    if (calendarOpen) {
+      document.addEventListener('mousedown', handleOutside);
+      document.addEventListener('keydown', handleEsc);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
   }, [calendarOpen]);
 
   const handleDateSelect = (date) => {
@@ -443,10 +485,21 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
     return generateTimeOptions(s, e);
   }, [activeResource]);
 
+  const rawEndTimeOptions = useMemo(() => {
+    const s = String(activeResource?.availabilityStart ?? '07:00').substring(0, 5);
+    const e = String(activeResource?.availabilityEnd ?? '22:00').substring(0, 5);
+    return generateEndTimeOptions(s, e);
+  }, [activeResource]);
+
   const endTimeOptions = useMemo(
-    () => (form.startTime ? timeOptions.filter((t) => t > form.startTime) : timeOptions),
-    [timeOptions, form.startTime],
+    () => (form.startTime ? rawEndTimeOptions.filter((t) => t > form.startTime) : rawEndTimeOptions),
+    [rawEndTimeOptions, form.startTime],
   );
+
+  const startTimeOptions = useMemo(() => {
+    if (form.date !== today) return timeOptions;
+    return timeOptions.filter((t) => t > nowTime);
+  }, [form.date, timeOptions, today, nowTime]);
 
   return (
     // Task 5 & Date Picker Fix: flex-col so the sticky action bar stays pinned at the bottom, h-full and relative for proper layout boundaries
@@ -576,7 +629,7 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.18 }}
-            className="space-y-5 pb-48" /* Added pb-48 to ensure the popover calendar doesn't get clipped and can open fully */
+            className="space-y-5 pb-24 md:pb-28"
           >
             {/* Selected resource summary */}
             {activeResource && (
@@ -656,7 +709,7 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                   }}
                 >
                   <option value="">-- Select --</option>
-                  {timeOptions.map((t) => (
+                  {startTimeOptions.map((t) => (
                     <option key={t} value={t}>{t}</option>
                   ))}
                 </select>
@@ -705,6 +758,13 @@ export default function BookingForm({ initial = {}, onSubmit, loading, submitLab
                         ⛔ This conflicts with an existing reservation from{' '}
                         <span className="font-bold">{slotBooked.startTime}</span> to{' '}
                         <span className="font-bold">{slotBooked.endTime}</span>. Please choose a different time.
+                      </p>
+                    )}
+
+                    {slotHasPending && !slotBooked && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-3 font-medium">
+                        Warning: another pending request overlaps this slot. You can continue,
+                        but final approval is not guaranteed.
                       </p>
                     )}
 
