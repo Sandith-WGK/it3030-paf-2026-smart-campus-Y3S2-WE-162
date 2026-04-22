@@ -7,10 +7,11 @@ import {
   Briefcase
 } from 'lucide-react';
 import Layout from '../components/layout/Layout';
-import { isAdmin,isTechnician } from '../utils/auth';
 import bookingService from '../services/api/bookingService';
 import { userService } from '../services/api/userService';
 import resourceService from '../services/api/resourceService';
+import { ticketService } from '../services/api/ticketService';
+import { useAuth } from '../context/AuthContext';
 
 const userCards = [
   {
@@ -64,7 +65,7 @@ const userCards = [
 ];
 
 // eslint-disable-next-line no-unused-vars
-function AdminStatCard({ label, value, icon: StatIcon, color, bg, loading: busy }) {
+function StatCard({ label, value, icon: StatIcon, color, bg, loading: busy }) {
   return (
     <div className={`rounded-xl ${bg} border border-zinc-200 dark:border-zinc-800 px-5 py-4 flex items-center gap-4`}>
       <div className={`rounded-lg p-2.5 ${bg}`}>
@@ -120,45 +121,97 @@ const adminCards = [
     href: '/admin/resources',
     countKey: 'totalResources',
   },
+  {
+    title: 'Manage Tickets',
+    description: 'Overview and manage campus-wide maintenance issues.',
+    icon: Wrench,
+    color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-500/10',
+    border: 'border-blue-100 dark:border-blue-500/20',
+    btnClass:
+      'text-blue-600 bg-blue-50 hover:bg-blue-100 dark:text-blue-300 dark:bg-blue-500/10 dark:hover:bg-blue-500/20',
+    btnLabel: 'Ticketing Center',
+    href: '/admin/tickets',
+    countKey: 'totalTickets',
+  },
 ];
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const admin = isAdmin();
-  const technician = isTechnician();
+  const { user } = useAuth();
+  const admin = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
+  const technician = String(user?.role || '').trim().toUpperCase() === 'TECHNICIAN';
 
   const [counts, setCounts] = useState({
     pendingBookings: 0,
     totalUsers: 0,
     totalResources: 0,
     todayBookings: 0,
+    totalTickets: 0,
+    myOpenTasks: 0,
+    myCompletedTasks: 0,
   });
-  const [countsLoading, setCountsLoading] = useState(admin);
+  const [countsLoading, setCountsLoading] = useState(admin || technician);
 
   useEffect(() => {
-    if (!admin) return;
+    if (!admin && !technician) return;
     const today = new Date().toISOString().split('T')[0];
 
-    Promise.allSettled([
-      bookingService.getAllBookings({ status: 'PENDING' }),
-      userService.getAllUsers(),
-      resourceService.getResources(),
-      bookingService.getAllBookings({ date: today }),
-    ]).then(([pendingRes, usersRes, resourcesRes, todayRes]) => {
+    const promises = [];
+    if (admin) {
+      promises.push(
+        bookingService.getAllBookings({ status: 'PENDING' }),
+        userService.getAllUsers(),
+        resourceService.getResources(),
+        bookingService.getAllBookings({ date: today }),
+        ticketService.getAllTickets({ status: 'OPEN' })
+      );
+    } else if (technician) {
+      promises.push(ticketService.getMyTasks());
+    }
+
+    Promise.allSettled(promises).then((results) => {
       const extract = (r) => {
-        if (r.status !== 'fulfilled') return [];
+        if (r?.status !== 'fulfilled') return [];
         const d = r.value?.data?.data ?? r.value?.data ?? r.value;
         return Array.isArray(d) ? d : [];
       };
-      setCounts({
-        pendingBookings: extract(pendingRes).length,
-        totalUsers: extract(usersRes).length,
-        totalResources: extract(resourcesRes).length,
-        todayBookings: extract(todayRes).length,
-      });
+
+      if (admin) {
+        setCounts(prev => ({
+          ...prev,
+          pendingBookings: extract(results[0]).length,
+          totalUsers: extract(results[1]).length,
+          totalResources: extract(results[2]).length,
+          todayBookings: extract(results[3]).length,
+          totalTickets: extract(results[4]).length,
+        }));
+      } else if (technician) {
+        const tasks = extract(results[0]);
+        setCounts(prev => ({
+          ...prev,
+          myOpenTasks: tasks.filter(t => t.status === 'OPEN' || t.status === 'IN_PROGRESS').length,
+          myCompletedTasks: tasks.filter(t => t.status === 'RESOLVED' || t.status === 'CLOSED').length,
+        }));
+      }
       setCountsLoading(false);
     });
-  }, [admin]);
+  }, [admin, technician]);
+
+  const displayedUserCards = userCards.filter(card => !technician || (card.title !== 'My Bookings' && card.title !== 'Maintenance Tickets'));
+  if (technician) {
+    displayedUserCards.unshift({
+      title: 'Technician Tasks',
+      description: 'View and manage the maintenance tickets assigned to you for resolution.',
+      icon: Briefcase,
+      color: 'text-violet-600 dark:text-violet-400',
+      bg: 'bg-violet-50 dark:bg-violet-500/10',
+      border: 'border-violet-100 dark:border-violet-500/20',
+      btnClass: 'text-violet-600 bg-violet-50 hover:bg-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20',
+      btnLabel: 'View My Tasks',
+      href: '/technician/tasks',
+    });
+  }
 
   return (
     <Layout title="Dashboard">
@@ -175,39 +228,19 @@ export default function Dashboard() {
      
       
       {technician && (
-        <Motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          // Use userCards.length instead of cards.length
-          transition={{ delay: userCards.length * 0.07 }} 
-          className="rounded-2xl border border-violet-100 dark:border-violet-500/20 bg-white dark:bg-zinc-900 p-6 shadow-sm hover:shadow-md transition-shadow mb-10"
-        >
-          <div className="inline-flex rounded-xl bg-violet-50 dark:bg-violet-500/10 p-3 mb-4">
-            {/* Make sure Briefcase is imported at the top */}
-            <Wrench size={22} className="text-violet-600 dark:text-violet-400" />
-          </div>
-          <h3 className="text-base font-semibold text-zinc-900 dark:text-zinc-100 mb-1.5">
-            Technician Tasks
-          </h3>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-5 leading-relaxed">
-            View and manage the maintenance tickets assigned to you for resolution.
-          </p>
-          <button
-            onClick={() => navigate('/technician/tasks')}
-            className="text-sm font-semibold px-4 py-2 rounded-lg transition-colors text-violet-600 bg-violet-50 hover:bg-violet-100 dark:text-violet-300 dark:bg-violet-500/10 dark:hover:bg-violet-500/20"
-          >
-            View My Tasks
-          </button>
-        </Motion.div>
+        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
+          <StatCard label="Active Tasks" value={counts.myOpenTasks} icon={Wrench} color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-500/10" loading={countsLoading} />
+          <StatCard label="Completed Tasks" value={counts.myCompletedTasks} icon={ClipboardList} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-500/10" loading={countsLoading} />
+        </div>
       )}
 
       {/* ── Admin: live stats strip ── */}
       {admin && (
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4 mb-8">
-          <AdminStatCard label="Pending Approvals" value={counts.pendingBookings} icon={AlertCircle} color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-500/10" loading={countsLoading} />
-          <AdminStatCard label="Today's Bookings" value={counts.todayBookings} icon={CalendarDays} color="text-violet-600 dark:text-violet-400" bg="bg-violet-50 dark:bg-violet-500/10" loading={countsLoading} />
-          <AdminStatCard label="Total Users" value={counts.totalUsers} icon={Users} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-500/10" loading={countsLoading} />
-          <AdminStatCard label="Total Resources" value={counts.totalResources} icon={Package} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-500/10" loading={countsLoading} />
+          <StatCard label="Pending Approvals" value={counts.pendingBookings} icon={AlertCircle} color="text-amber-600 dark:text-amber-400" bg="bg-amber-50 dark:bg-amber-500/10" loading={countsLoading} />
+          <StatCard label="Today's Bookings" value={counts.todayBookings} icon={CalendarDays} color="text-violet-600 dark:text-violet-400" bg="bg-violet-50 dark:bg-violet-500/10" loading={countsLoading} />
+          <StatCard label="Total Users" value={counts.totalUsers} icon={Users} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-500/10" loading={countsLoading} />
+          <StatCard label="Total Resources" value={counts.totalResources} icon={Package} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-500/10" loading={countsLoading} />
         </div>
       )}
 
@@ -220,7 +253,7 @@ export default function Dashboard() {
               Core platform management — bookings, users, and resources.
             </p>
           </div>
-          <div className="grid gap-5 md:grid-cols-3 mb-10">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-10">
             {adminCards.map((card, i) => {
               const count = card.countKey ? counts[card.countKey] : null;
               return (
@@ -271,7 +304,8 @@ export default function Dashboard() {
       )}
 
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-        {userCards.map((card, i) => (
+        {displayedUserCards
+          .map((card, i) => (
           <Motion.div
             key={card.title}
             initial={{ opacity: 0, y: 16 }}

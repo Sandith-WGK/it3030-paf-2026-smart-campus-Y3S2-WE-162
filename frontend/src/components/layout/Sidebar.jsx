@@ -29,10 +29,10 @@ const sectionLabelText = 'text-[11px] font-semibold uppercase tracking-wider tex
 export default function Sidebar({ open, onClose }) {
   // Use the auth context so we only run admin checks once the user is fully loaded
   const { user, loading } = useAuth();
-  const admin = user?.role === 'ADMIN';
+  const admin = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
   const [pendingCount, setPendingCount] = useState(0);
-  const technician = isTechnician();
-  const canSeeTasks = admin || technician;
+  const technician = String(user?.role || '').trim().toUpperCase() === 'TECHNICIAN';
+  const canSeeTasks = technician;
 
 
   useEffect(() => {
@@ -100,33 +100,37 @@ export default function Sidebar({ open, onClose }) {
             Resources
           </NavLink>
 
-          <NavLink
-            to="/bookings"
-            end
-            className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
-            onClick={onClose}
-          >
-            <CalendarDays size={18} />
-            My Bookings
-          </NavLink>
+          {!technician && (
+            <>
+              <NavLink
+                to="/bookings"
+                end
+                className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
+                onClick={onClose}
+              >
+                <CalendarDays size={18} />
+                My Bookings
+              </NavLink>
 
-          <NavLink
-            to="/bookings/new"
-            className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
-            onClick={onClose}
-          >
-            <PlusSquare size={18} />
-            New Booking
-          </NavLink>
+              <NavLink
+                to="/bookings/new"
+                className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
+                onClick={onClose}
+              >
+                <PlusSquare size={18} />
+                New Booking
+              </NavLink>
 
-          <NavLink
-            to="/tickets"
-            className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
-            onClick={onClose}
-          >
-            <Wrench size={18} />
-            Maintenance Tickets
-          </NavLink>
+              <NavLink
+                to="/tickets"
+                className={({ isActive }) => `${navItem} ${isActive ? activeClass : inactiveClass}`}
+                onClick={onClose}
+              >
+                <Wrench size={18} />
+                Maintenance Tickets
+              </NavLink>
+            </>
+          )}
 
           {canSeeTasks && (
             <NavLink

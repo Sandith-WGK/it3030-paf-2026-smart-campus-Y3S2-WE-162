@@ -155,6 +155,12 @@ public class ResourceService {
 
         // Validate the updated resource
         validateResource(updatedResource);
+        
+        // Capture old values for detail-change notifications
+        String oldLocation = existingResource.getLocation();
+        Integer oldCapacity = existingResource.getCapacity();
+        LocalTime oldStart = existingResource.getAvailabilityStart();
+        LocalTime oldEnd = existingResource.getAvailabilityEnd();
 
         // Update fields
         ResourceStatus oldStatus = existingResource.getStatus();
@@ -172,6 +178,21 @@ public class ResourceService {
         // Notify if status changed away from ACTIVE
         if (oldStatus == ResourceStatus.ACTIVE && saved.getStatus() != ResourceStatus.ACTIVE) {
             notifyAffectedUsers(saved);
+        } else if (oldStatus != ResourceStatus.ACTIVE && saved.getStatus() == ResourceStatus.ACTIVE) {
+            notifyResourceRestoration(saved);
+        }
+        
+        // Notify if critical details changed (Location, Capacity, or Times)
+        List<String> changes = new ArrayList<>();
+        if (oldLocation != null && !oldLocation.equals(saved.getLocation())) changes.add("Location");
+        if (oldCapacity != null && !oldCapacity.equals(saved.getCapacity())) changes.add("Capacity");
+        if ((oldStart != null && !oldStart.equals(saved.getAvailabilityStart())) || 
+            (oldEnd != null && !oldEnd.equals(saved.getAvailabilityEnd()))) {
+            changes.add("Availability Hours");
+        }
+        
+        if (!changes.isEmpty()) {
+            notifyResourceDetailUpdate(saved, changes);
         }
 
         log.info("Updating resource: {}", id);
@@ -195,10 +216,55 @@ public class ResourceService {
         // Notify if status changed away from ACTIVE
         if (oldStatus == ResourceStatus.ACTIVE && status != ResourceStatus.ACTIVE) {
             notifyAffectedUsers(saved);
+        } else if (oldStatus != ResourceStatus.ACTIVE && status == ResourceStatus.ACTIVE) {
+            notifyResourceRestoration(saved);
         }
         
         log.info("Updating resource status: {} -> {}", id, status);
         return saved;
+    }
+
+    /**
+     * Notify users that a resource's critical details have changed.
+     */
+    private void notifyResourceDetailUpdate(Resource resource, List<String> changes) {
+        List<BookingStatus> activeStatuses = List.of(BookingStatus.APPROVED, BookingStatus.PENDING);
+        List<Booking> affectedBookings = bookingRepository.findByResourceIdAndStatusInAndDateGreaterThanEqual(
+                resource.getId(), activeStatuses, LocalDate.now());
+
+        String changeString = String.join(", ", changes);
+        for (Booking booking : affectedBookings) {
+            notificationService.sendNotification(
+                    booking.getUserId(),
+                    String.format("Information Update: The details for %s have been updated (%s). Please check your booking on %s to ensure it still meets your requirements.",
+                            resource.getName(), changeString, booking.getDate()),
+                    NotifType.RESOURCE_UPDATE,
+                    Severity.INFO,
+                    resource.getId(),
+                    "RESOURCE"
+            );
+        }
+    }
+
+    /**
+     * Notify users that a resource is back in service.
+     */
+    private void notifyResourceRestoration(Resource resource) {
+        List<BookingStatus> activeStatuses = List.of(BookingStatus.APPROVED, BookingStatus.PENDING);
+        List<Booking> affectedBookings = bookingRepository.findByResourceIdAndStatusInAndDateGreaterThanEqual(
+                resource.getId(), activeStatuses, LocalDate.now());
+
+        for (Booking booking : affectedBookings) {
+            notificationService.sendNotification(
+                    booking.getUserId(),
+                    String.format("Great news: %s is back in service! Your booking on %s is confirmed and ready for use.",
+                            resource.getName(), booking.getDate()),
+                    NotifType.RESOURCE_UPDATE,
+                    Severity.SUCCESS,
+                    resource.getId(),
+                    "RESOURCE"
+            );
+        }
     }
 
     private void notifyAffectedUsers(Resource resource) {
@@ -225,11 +291,34 @@ public class ResourceService {
      * @throws ResourceNotFoundException if resource not found
      */
     public void deleteResource(String id) {
-        if (!resourceRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Resource not found with id: " + id);
-        }
+        Resource resource = getResourceById(id);
+        
+        // Notify affected users before deletion
+        notifyResourceDeletion(resource);
+        
         log.info("Deleting resource: {}", id);
         resourceRepository.deleteById(id);
+    }
+
+    /**
+     * Notify users that a resource is being permanently deleted.
+     */
+    private void notifyResourceDeletion(Resource resource) {
+        List<BookingStatus> activeStatuses = List.of(BookingStatus.APPROVED, BookingStatus.PENDING);
+        List<Booking> affectedBookings = bookingRepository.findByResourceIdAndStatusInAndDateGreaterThanEqual(
+                resource.getId(), activeStatuses, LocalDate.now());
+
+        for (Booking booking : affectedBookings) {
+            notificationService.sendNotification(
+                    booking.getUserId(),
+                    String.format("Cancellation Alert: %s has been permanently removed from the facility list. Your booking on %s has been canceled.",
+                            resource.getName(), booking.getDate()),
+                    NotifType.RESOURCE_UPDATE,
+                    Severity.ALERT,
+                    resource.getId(),
+                    "RESOURCE"
+            );
+        }
     }
 
     /**
