@@ -18,13 +18,15 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 @Document(collection = "bookings")
-// C1 Race-condition guard: only one booking may occupy an exact
-// (resourceId, date, startTime, endTime) slot. MongoDB enforces this atomically.
+// Race-condition guard: only one APPROVED booking may occupy an exact
+// (resourceId, date, startTime, endTime) slot.
+// Multiple PENDING requests are allowed for admin arbitration.
 @CompoundIndexes({
     @CompoundIndex(
         name = "unique_slot",
         def  = "{'resourceId': 1, 'date': 1, 'startTime': 1, 'endTime': 1}",
-        unique = true
+        unique = true,
+        partialFilter = "{ 'status': 'APPROVED' }"
     )
 })
 @Data
