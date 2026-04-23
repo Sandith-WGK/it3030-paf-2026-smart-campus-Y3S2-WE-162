@@ -60,9 +60,33 @@ public class TicketServiceImpl implements TicketService {
                 .priority(request.getPriority())
                 .resourceId(request.getResourceId())
                 .contactDetails(request.getContactDetails())
+                .preferredContactMethod(request.getPreferredMethod())
+                .email(request.getEmail())
+                .phoneNumber(request.getPhoneNumber())
                 .reporterId(reporterId)
                 .status(TicketStatus.OPEN)
                 .build();
+        
+        // Conditional validation
+        if ("PHONE".equalsIgnoreCase(request.getPreferredMethod())) {
+            String phone = request.getPhoneNumber();
+            if (phone == null || phone.isBlank()) {
+                throw new IllegalArgumentException("Phone number is required when preferred contact method is PHONE");
+            }
+            if (!phone.matches("^(\\+94|0)[0-9]{9}$")) {
+                throw new IllegalArgumentException("Invalid Sri Lankan phone number format");
+            }
+        }
+        
+        if ("EMAIL".equalsIgnoreCase(request.getPreferredMethod())) {
+            String email = request.getEmail();
+            if (email == null || email.isBlank()) {
+                throw new IllegalArgumentException("Email is required when preferred contact method is EMAIL");
+            }
+            if (!email.matches("^[A-Za-z0-9+_.-]+@gmail\\.com$")) {
+                throw new IllegalArgumentException("Only @gmail.com emails are allowed");
+            }
+        }
         Ticket saved = ticketRepository.save(ticket);
         
         // Notify the reporter
@@ -284,6 +308,9 @@ public class TicketServiceImpl implements TicketService {
                 .priority(ticket.getPriority())
                 .status(ticket.getStatus())
                 .contactDetails(ticket.getContactDetails())
+                .preferredContactMethod(ticket.getPreferredContactMethod()) // Matches field in TicketResponse.java
+                .email(ticket.getEmail())
+                .phoneNumber(ticket.getPhoneNumber())
                 .attachments(ticket.getAttachments())
                 .resolutionNote(ticket.getResolutionNote())
                 .rejectionReason(ticket.getRejectionReason())

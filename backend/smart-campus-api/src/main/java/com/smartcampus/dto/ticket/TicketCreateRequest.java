@@ -26,4 +26,10 @@ public class TicketCreateRequest {
     private String resourceId;
 
     private String contactDetails;
+
+    @NotBlank(message = "Preferred contact method is required")
+    private String preferredMethod; 
+
+    private String email;
+    private String phoneNumber;
 }

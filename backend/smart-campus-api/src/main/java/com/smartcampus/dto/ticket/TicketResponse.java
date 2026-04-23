@@ -27,6 +27,9 @@ public class TicketResponse {
     private Priority priority;
     private TicketStatus status;
     private String contactDetails;
+    private String preferredContactMethod;
+    private String email;
+    private String phoneNumber;
     private List<Attachment> attachments;
     private String resolutionNote;
     private String rejectionReason;
