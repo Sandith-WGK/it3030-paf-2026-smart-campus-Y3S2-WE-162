@@ -1,6 +1,7 @@
 package com.smartcampus.controller;
 
 import com.smartcampus.dto.ApiResponse;
+import com.smartcampus.dto.PagedResponse;
 import com.smartcampus.dto.booking.BookingAnalyticsResponse;
 import com.smartcampus.dto.booking.BookingRejectRequest;
 import com.smartcampus.dto.booking.BookingRequest;
@@ -64,13 +65,13 @@ public class BookingController {
     // Get the authenticated user's own bookings, optionally filtered by status.
 
     @GetMapping("/my")
-    public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings(
+    public ResponseEntity<ApiResponse<PagedResponse<BookingResponse>>> getMyBookings(
             @RequestParam(required = false) BookingStatus status,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @AuthenticationPrincipal UserPrincipal principal) {
 
-        List<BookingResponse> bookings = bookingService.getMyBookings(principal.getId(), status, page, size);
+        PagedResponse<BookingResponse> bookings = bookingService.getMyBookings(principal.getId(), status, page, size);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noCache())
                 .body(ApiResponse.success("Bookings retrieved successfully", bookings));
@@ -89,7 +90,7 @@ public class BookingController {
         // Task 7: pass requesting user id so the service can anonymise other users' PENDING bookings
         List<BookingResponse> bookings = bookingService.getResourceSchedule(resourceId, date, principal.getId());
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(30, TimeUnit.SECONDS))
+                .cacheControl(CacheControl.noStore().cachePrivate())
                 .body(ApiResponse.success("Resource schedule retrieved", bookings));
     }
 
@@ -98,7 +99,7 @@ public class BookingController {
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<BookingResponse>>> getAllBookings(
+    public ResponseEntity<ApiResponse<PagedResponse<BookingResponse>>> getAllBookings(
             @RequestParam(required = false) BookingStatus status,
             @RequestParam(required = false) String resourceId,
             @RequestParam(required = false) String userId,
@@ -106,7 +107,7 @@ public class BookingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
 
-        List<BookingResponse> bookings = bookingService.getAllBookings(status, resourceId, userId, date, page, size);
+        PagedResponse<BookingResponse> bookings = bookingService.getAllBookings(status, resourceId, userId, date, page, size);
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noCache())
                 .body(ApiResponse.success("All bookings retrieved successfully", bookings));
@@ -183,9 +184,11 @@ public class BookingController {
     // ── DELETE /api/v1/bookings/{id} ─────────────────────────────────────────
     // Delete a booking. Users can only delete PENDING or CANCELLED bookings they own.
     // Admins can delete any booking.
+    // Returns 200 with ApiResponse wrapper for consistency with all other endpoints
+    // (satisfies the Uniform Interface REST constraint).
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteBooking(
+    public ResponseEntity<ApiResponse<Void>> deleteBooking(
             @PathVariable String id,
             @AuthenticationPrincipal UserPrincipal principal) {
 
@@ -193,7 +196,7 @@ public class BookingController {
                 .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
         bookingService.deleteBooking(id, principal.getId(), isAdmin);
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.success("Booking deleted successfully", null));
     }
 
     // ── GET /api/v1/bookings/analytics ─────────────────────────────────────────
@@ -212,8 +215,25 @@ public class BookingController {
     // Returns resource details, booker name, and time slot for physical verification.
 
     @GetMapping("/{id}/verify")
-    public ResponseEntity<ApiResponse<BookingResponse>> verifyBooking(@PathVariable String id) {
-        BookingResponse response = bookingService.verifyBookingForCheckIn(id);
+    public ResponseEntity<ApiResponse<BookingResponse>> verifyBooking(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+                
+        BookingResponse response = bookingService.verifyBookingForCheckIn(id, principal.getId(), isAdmin);
         return ResponseEntity.ok(ApiResponse.success("Booking verified successfully", response));
+    }
+
+    @GetMapping("/{id}/verify-token")
+    public ResponseEntity<ApiResponse<String>> getVerifyToken(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        boolean isAdmin = principal.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+
+        String token = bookingService.generateVerifyToken(id, principal.getId(), isAdmin);
+        return ResponseEntity.ok(ApiResponse.success("Verify token generated", token));
     }
 }

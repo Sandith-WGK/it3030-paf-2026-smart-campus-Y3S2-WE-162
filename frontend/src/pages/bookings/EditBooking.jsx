@@ -5,10 +5,20 @@ import Layout from '../../components/layout/Layout';
 import BookingForm from '../../components/booking/BookingForm';
 import Toast from '../../components/common/Toast';
 import bookingService from '../../services/api/bookingService';
+import { useAuth } from '../../context/AuthContext';
+
+function toHHmm(value) {
+  if (!value) return '';
+  const str = String(value);
+  return str.length >= 5 ? str.substring(0, 5) : str;
+}
 
 export default function EditBooking() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // JWT may encode the user id as userId, sub, or id
+  const currentUserId = user?.userId ?? user?.sub ?? user?.id ?? null;
   const [booking, setBooking] = useState(null);
   const [loadingBooking, setLoadingBooking] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -63,8 +73,8 @@ export default function EditBooking() {
   const initial = {
     resourceId: booking.resourceId,
     date: booking.date,
-    startTime: booking.startTime,
-    endTime: booking.endTime,
+    startTime: toHHmm(booking.startTime),
+    endTime: toHHmm(booking.endTime),
     purpose: booking.purpose,
     expectedAttendees: booking.expectedAttendees ?? '',
   };
@@ -100,6 +110,7 @@ export default function EditBooking() {
             onSubmit={handleSubmit}
             loading={submitting}
             submitLabel="Save Changes"
+            currentUserId={currentUserId}
           />
         </div>
       </div>

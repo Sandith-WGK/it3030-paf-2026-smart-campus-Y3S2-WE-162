@@ -8,6 +8,7 @@ import com.smartcampus.model.*;
 import com.smartcampus.repository.BookingRepository;
 import com.smartcampus.repository.ResourceRepository;
 import com.smartcampus.repository.UserRepository;
+import com.smartcampus.security.BookingVerificationTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -41,6 +43,8 @@ class BookingResourceIntegrationTest {
     @Mock private ResourceRepository resourceRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
+    @Mock private BookingVerificationTokenService bookingVerificationTokenService;
+    @Mock private MongoTemplate mongoTemplate;
 
     @InjectMocks
     private BookingService bookingService;
@@ -461,6 +465,8 @@ class BookingResourceIntegrationTest {
                     .id("b-orphan")
                     .resourceId("res-deleted")
                     .userId(USER_ID)
+                    .resourceNameSnapshot("Old Networking Lab")
+                    .userNameSnapshot("Integration Tester")
                     .date(FUTURE_DATE)
                     .startTime(LocalTime.of(10, 0))
                     .endTime(LocalTime.of(11, 0))
@@ -473,7 +479,8 @@ class BookingResourceIntegrationTest {
 
             BookingResponse result = bookingService.getBookingById("b-orphan", USER_ID, false);
 
-            assertThat(result.getResourceName()).isEqualTo("Unknown Resource");
+            assertThat(result.getResourceName()).isEqualTo("Old Networking Lab");
+            assertThat(result.isResourceRecordDeleted()).isTrue();
         }
     }
 }

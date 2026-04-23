@@ -65,7 +65,7 @@ const AdminRoute = ({ children }) => {
   }
   
   if (!isAuthenticated) return <Navigate to="/" replace />;
-  if (user?.role !== 'ADMIN') return <Navigate to="/dashboard" replace />;
+  if (String(user?.role || '').trim().toUpperCase() !== 'ADMIN') return <Navigate to="/dashboard" replace />;
   
   return children;
 };
@@ -97,8 +97,8 @@ const TechnicianRoute = ({ children }) => {
   if (!isAuthenticated) return <Navigate to="/" replace />;
   
   // 3. Now that we are sure 'user' exists, check the role
-  const isTech = user?.role === 'TECHNICIAN';
-  const isAdm = user?.role === 'ADMIN';
+  const isTech = String(user?.role || '').trim().toUpperCase() === 'TECHNICIAN';
+  const isAdm = String(user?.role || '').trim().toUpperCase() === 'ADMIN';
 
   if (!isTech && !isAdm) {
     return <Navigate to="/dashboard" replace />;
@@ -123,6 +123,7 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/verify-2fa" element={<VerifyTwoFactor />} />
       <Route path="/verify-booking/:id" element={<VerifyBooking />} />
+      <Route path="/verify-booking" element={<VerifyBooking />} />
       
       {/* Protected routes (USER) */}
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />

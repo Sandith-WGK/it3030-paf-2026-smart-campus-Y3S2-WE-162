@@ -12,15 +12,17 @@ import com.smartcampus.model.*;
 import com.smartcampus.repository.BookingRepository;
 import com.smartcampus.repository.ResourceRepository;
 import com.smartcampus.repository.UserRepository;
+import com.smartcampus.security.BookingVerificationTokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -39,6 +41,8 @@ class BookingServiceTest {
     @Mock private ResourceRepository resourceRepository;
     @Mock private UserRepository userRepository;
     @Mock private NotificationService notificationService;
+    @Mock private BookingVerificationTokenService bookingVerificationTokenService;
+    @Mock private MongoTemplate mongoTemplate;
 
     @InjectMocks
     private BookingService bookingService;
@@ -205,6 +209,44 @@ class BookingServiceTest {
             assertThatThrownBy(() -> bookingService.createBooking(request, USER_ID))
                     .isInstanceOf(InvalidBookingStateException.class)
                     .hasMessageContaining("exceeds resource capacity");
+        }
+
+        @Test
+        @DisplayName("rejects booking when expected attendees is zero")
+        void rejectsZeroAttendees() {
+            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
+
+            BookingRequest request = BookingRequest.builder()
+                    .resourceId("res-001")
+                    .date(FUTURE_DATE)
+                    .startTime(LocalTime.of(10, 0))
+                    .endTime(LocalTime.of(11, 0))
+                    .purpose("Standup meeting")
+                    .expectedAttendees(0)
+                    .build();
+
+            assertThatThrownBy(() -> bookingService.createBooking(request, USER_ID))
+                    .isInstanceOf(InvalidBookingStateException.class)
+                    .hasMessageContaining("positive number");
+        }
+
+        @Test
+        @DisplayName("rejects booking when expected attendees is missing for capacity resource")
+        void rejectsMissingAttendeesForCapacityResource() {
+            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
+
+            BookingRequest request = BookingRequest.builder()
+                    .resourceId("res-001")
+                    .date(FUTURE_DATE)
+                    .startTime(LocalTime.of(10, 0))
+                    .endTime(LocalTime.of(11, 0))
+                    .purpose("Project sync meeting")
+                    .expectedAttendees(null)
+                    .build();
+
+            assertThatThrownBy(() -> bookingService.createBooking(request, USER_ID))
+                    .isInstanceOf(InvalidBookingStateException.class)
+                    .hasMessageContaining("required");
         }
     }
 
@@ -621,6 +663,63 @@ class BookingServiceTest {
 
             assertThat(schedule).hasSize(1);
             assertThat(schedule.get(0).getResourceName()).isEqualTo("Meeting Room A");
+        }
+    }
+
+    @Nested
+    @DisplayName("QR Verify Token")
+    class VerifyToken {
+        @Test
+        @DisplayName("verifies approved booking by valid token")
+        void verifiesByValidToken() {
+            Booking approved = Booking.builder()
+                    .id("booking-verify")
+                    .resourceId("res-001")
+                    .userId(USER_ID)
+                    .date(LocalDate.now(java.time.ZoneId.of("Asia/Colombo")))
+                    .startTime(LocalTime.of(10, 0))
+                    .endTime(LocalTime.of(11, 0))
+                    .status(BookingStatus.APPROVED)
+                    .build();
+
+            when(bookingVerificationTokenService.validateAndGetBookingId("valid-token"))
+                    .thenReturn("booking-verify");
+            when(bookingRepository.findById("booking-verify")).thenReturn(Optional.of(approved));
+            when(resourceRepository.findById("res-001")).thenReturn(Optional.of(activeRoom));
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+
+            BookingResponse response = bookingService.verifyBookingByToken("valid-token");
+            assertThat(response.getStatus()).isEqualTo(BookingStatus.APPROVED);
+            assertThat(response.getId()).isEqualTo("booking-verify");
+        }
+    }
+
+    @Nested
+    @DisplayName("Pagination")
+    class Pagination {
+        @Test
+        @DisplayName("returns paged my bookings metadata")
+        void returnsPagedMyBookings() {
+            Booking booking = Booking.builder()
+                    .id("booking-page-1")
+                    .resourceId("res-001")
+                    .userId(USER_ID)
+                    .date(FUTURE_DATE)
+                    .startTime(LocalTime.of(9, 0))
+                    .endTime(LocalTime.of(10, 0))
+                    .status(BookingStatus.PENDING)
+                    .build();
+
+            when(mongoTemplate.count(any(Query.class), eq(Booking.class))).thenReturn(35L);
+            when(mongoTemplate.find(any(Query.class), eq(Booking.class))).thenReturn(List.of(booking));
+            when(resourceRepository.findAllById(anyList())).thenReturn(List.of(activeRoom));
+            when(userRepository.findById(USER_ID)).thenReturn(Optional.of(testUser));
+
+            var page = bookingService.getMyBookings(USER_ID, null, 0, 20);
+            assertThat(page.getContent()).hasSize(1);
+            assertThat(page.getTotalElements()).isEqualTo(35L);
+            assertThat(page.isHasNext()).isTrue();
+            assertThat(page.getTotalPages()).isEqualTo(2);
         }
     }
 }
