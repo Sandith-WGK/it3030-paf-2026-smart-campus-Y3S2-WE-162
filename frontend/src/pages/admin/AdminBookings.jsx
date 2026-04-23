@@ -91,10 +91,9 @@ export default function AdminBookings() {
       .getAllBookings({ ...filters, page, size: PAGE_SIZE })
       .then((res) => {
         const raw = res.data?.data ?? res.data;
-        const list = Array.isArray(raw) ? raw : [];
+        const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
         setBookings(sortBookings(list));
-        // Backend currently returns a plain list; infer next page availability.
-        setHasMore(list.length === PAGE_SIZE);
+        setHasMore(Boolean(raw?.hasNext));
       })
       .catch(() => {
         setToast({ type: 'error', message: 'Failed to load bookings' });
@@ -134,6 +133,7 @@ export default function AdminBookings() {
 
   // ── Single approve ────────────────────────────────────────────────────────────
   const handleApprove = async () => {
+    if (approveLoading || !approveTarget) return;
     setApproveLoading(true);
     try {
       await bookingService.approveBooking(approveTarget.id);
@@ -165,6 +165,7 @@ export default function AdminBookings() {
 
   // ── Bulk approve ──────────────────────────────────────────────────────────────
   const handleBulkApprove = async () => {
+    if (bulkLoading) return;
     setBulkLoading(true);
     const ids = selectedPendingIds;
     if (ids.length === 0) {
@@ -192,6 +193,8 @@ export default function AdminBookings() {
 
       setBulkApproveOpen(false);
       animateAndReload(ids);
+    } catch {
+      setToast({ type: 'error', message: 'Bulk approval failed. Please try again.' });
     } finally {
       setBulkLoading(false);
     }
