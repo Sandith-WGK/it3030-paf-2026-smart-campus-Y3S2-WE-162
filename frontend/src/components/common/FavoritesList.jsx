@@ -1,10 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { useFavorites } from '../../hooks/useFavorites';
-import { Heart, Trash2, Loader2, X } from 'lucide-react';
+import { Heart, Trash2, Loader2, X, ArrowRight } from 'lucide-react';
 
 const FavoritesList = () => {
   const { favorites, loading, removeFavorite, clearAllFavorites } = useFavorites();
+  
+  // Show only first 3 favorites
+  const displayFavorites = favorites.slice(0, 3);
+  const hasMore = favorites.length > 3;
 
   if (loading) {
     return (
@@ -45,8 +49,8 @@ const FavoritesList = () => {
         </button>
       </div>
 
-      <div className="divide-y divide-gray-100 dark:divide-gray-700 max-h-[400px] overflow-y-auto">
-        {favorites.map((item, index) => (
+      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+        {displayFavorites.map((item, index) => (
           <Link
             key={item.id}
             to={`/resources/${item.resourceId}`}
@@ -76,6 +80,21 @@ const FavoritesList = () => {
           </Link>
         ))}
       </div>
+
+      {/* View All Link - Shows when there are more than 3 favorites */}
+      {hasMore && (
+        <Link
+          to="/my-favorites"
+          className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors border-t border-gray-100 dark:border-gray-700"
+        >
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            + {favorites.length - 3} more favorite{favorites.length - 3 !== 1 ? 's' : ''}
+          </span>
+          <span className="text-xs font-medium text-violet-600 dark:text-violet-400 flex items-center gap-1">
+            View all <ArrowRight size={12} />
+          </span>
+        </Link>
+      )}
 
       <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
         <p className="text-xs text-gray-400 dark:text-gray-500 text-center">
