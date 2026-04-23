@@ -154,7 +154,7 @@ const ResourceCard = ({ resource, viewMode, onClick }) => {
   );
 };
 
-// Recently Viewed Component
+// Recently Viewed Component - NO sticky positioning
 const RecentlyViewedComponent = ({ items, onItemClick, onClear }) => {
   if (items.length === 0) {
     return (
@@ -175,7 +175,7 @@ const RecentlyViewedComponent = ({ items, onItemClick, onClear }) => {
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden sticky top-6">
+    <div className="bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
       <div className="p-4 border-b border-zinc-100 dark:border-zinc-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -669,7 +669,7 @@ const ResourceList = () => {
               </Link>
             </div>
 
-            {/* 3. Recently Viewed */}
+            {/* 3. Recently Viewed - NO sticky positioning */}
             <RecentlyViewedComponent 
               items={recentItems}
               onItemClick={(id) => {
