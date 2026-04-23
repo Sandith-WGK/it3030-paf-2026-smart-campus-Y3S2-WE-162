@@ -30,7 +30,7 @@ const getResourceTypeConfig = (type) => {
 const getStatusConfig = (status) => {
   return status === 'ACTIVE' 
     ? { label: 'Active', color: 'emerald', icon: CheckCircle }
-    : { label: 'Offline', color: 'rose', icon: AlertCircle };
+    : { label: 'Out of Service', color: 'rose', icon: AlertCircle };
 };
 
 // Recently Viewed Hook
