@@ -106,7 +106,7 @@ const StatCard = ({ title, value, icon: Icon, color }) => {
             </p>
           </div>
           <div className={`p-3 rounded-xl bg-gradient-to-br ${colorClasses[color]} bg-opacity-10`}>
-            <Icon size={20} className="text-white" />
+            {React.createElement(Icon, { size: 20, className: "text-white" })}
           </div>
         </div>
       </div>
