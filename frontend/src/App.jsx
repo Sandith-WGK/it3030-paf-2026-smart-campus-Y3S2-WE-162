@@ -123,6 +123,7 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmail />} />
       <Route path="/verify-2fa" element={<VerifyTwoFactor />} />
       <Route path="/verify-booking/:id" element={<VerifyBooking />} />
+      <Route path="/verify-booking" element={<VerifyBooking />} />
       
       {/* Protected routes (USER) */}
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />

@@ -29,6 +29,7 @@ import { notificationService } from '../services/api/notificationService';
 
 const extractArray = (payload) => {
   const data = payload?.data?.data ?? payload?.data ?? payload;
+  if (Array.isArray(data?.content)) return data.content;
   return Array.isArray(data) ? data : [];
 };
 
@@ -39,6 +40,13 @@ const extractCount = (payload) => {
   if (typeof payload?.data?.count === 'number') return payload.data.count;
   if (typeof payload?.data?.unreadCount === 'number') return payload.data.unreadCount;
   return 0;
+};
+
+const extractTotalElements = (payload) => {
+  const data = payload?.data?.data ?? payload?.data ?? payload;
+  if (typeof data?.totalElements === 'number') return data.totalElements;
+  if (Array.isArray(data?.content)) return data.content.length;
+  return Array.isArray(data) ? data.length : 0;
 };
 
 // eslint-disable-next-line no-unused-vars
@@ -127,7 +135,7 @@ export default function Dashboard() {
             currentUserId ? notificationService.getUserNotificationHistory(currentUserId) : Promise.resolve([]),
           ]);
 
-          const pendingBookings = pendingRes.status === 'fulfilled' ? extractArray(pendingRes.value).length : 0;
+          const pendingBookings = pendingRes.status === 'fulfilled' ? extractTotalElements(pendingRes.value) : 0;
           const highPriorityOpenTickets = highPrioRes.status === 'fulfilled' ? extractArray(highPrioRes.value).length : 0;
           const resources = resourcesRes.status === 'fulfilled' ? extractArray(resourcesRes.value) : [];
           const outOfService = resources.filter((r) => String(r.status || '').toUpperCase() === 'OUT_OF_SERVICE').length;

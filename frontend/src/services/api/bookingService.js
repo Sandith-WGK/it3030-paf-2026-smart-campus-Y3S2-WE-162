@@ -1,4 +1,5 @@
 import api from './axios';
+import publicApi from './publicAxios';
 
 const BASE = '/bookings';
 
@@ -7,8 +8,8 @@ const bookingService = {
   createBooking: (data) => api.post(BASE, data),
 
   // GET /bookings/my?status=...
-  getMyBookings: (status) =>
-    api.get(`${BASE}/my`, { params: status ? { status } : {} }),
+  getMyBookings: (status, page = 0, size = 20) =>
+    api.get(`${BASE}/my`, { params: { ...(status ? { status } : {}), page, size } }),
 
   // GET /bookings?status=...&resourceId=...&userId=...&date=...
   getAllBookings: (filters = {}) => api.get(BASE, { params: filters }),
@@ -41,6 +42,12 @@ const bookingService = {
 
   // GET /bookings/:id/verify  (QR code check-in verification)
   verifyBooking: (id) => api.get(`${BASE}/${id}/verify`),
+
+  // GET /bookings/:id/verify-token
+  getVerifyToken: (id) => api.get(`${BASE}/${id}/verify-token`),
+
+  // Public GET /public/bookings/verify?token=...
+  verifyBookingPublic: (token) => publicApi.get('/public/bookings/verify', { params: { token } }),
 };
 
 export default bookingService;
