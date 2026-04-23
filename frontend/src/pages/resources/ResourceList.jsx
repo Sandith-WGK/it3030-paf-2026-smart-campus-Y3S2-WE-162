@@ -31,7 +31,7 @@ const getStatusConfig = (status) => {
     : { label: 'Offline', color: 'rose', icon: AlertCircle };
 };
 
-// Recently Viewed Hook
+// Recently Viewed Hook (FIXED - no direct setState in useEffect)
 const useRecentlyViewed = () => {
   const STORAGE_KEY = 'recently_viewed_resources';
   const MAX_ITEMS = 5;
@@ -39,14 +39,17 @@ const useRecentlyViewed = () => {
   const [recentItems, setRecentItems] = useState([]);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        setRecentItems(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse recently viewed:', e);
+    const loadRecentItems = () => {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        try {
+          setRecentItems(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse recently viewed:', e);
+        }
       }
-    }
+    };
+    loadRecentItems();
   }, []);
 
   const addToRecentlyViewed = (resource) => {
