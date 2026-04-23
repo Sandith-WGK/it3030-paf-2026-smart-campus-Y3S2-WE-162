@@ -41,6 +41,10 @@ export default function Sidebar({ open, onClose }) {
       .getAllBookings({ status: 'PENDING' })
       .then((res) => {
         const raw = res.data?.data ?? res.data;
+        if (typeof raw?.totalElements === 'number') {
+          setPendingCount(raw.totalElements);
+          return;
+        }
         setPendingCount(Array.isArray(raw) ? raw.length : 0);
       })
       .catch(() => {});
