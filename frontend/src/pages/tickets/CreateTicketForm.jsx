@@ -14,7 +14,10 @@ export default function CreateTicketForm() {
     category: 'MAINTENANCE',
     description: '',
     priority: 'LOW',
-    contactDetails: ''
+    contactDetails: '',
+    preferredMethod: 'EMAIL',
+    email: '',
+    phoneNumber: ''
   });
 
   const [files, setFiles] = useState([]);
@@ -32,12 +35,42 @@ export default function CreateTicketForm() {
     setFiles(files.filter((_, i) => i !== index));
   };
 
+  const validateEmail = (email) => {
+    return /^[A-Za-z0-9+_.-]+@gmail\.com$/.test(email);
+  };
+
+  const validatePhone = (phone) => {
+    return /^(\+94|0)[0-9]{9}$/.test(phone);
+  };
+
+  const isFormValid = () => {
+    if (!formData.description) return false;
+    if (formData.preferredMethod === 'EMAIL') {
+      return validateEmail(formData.email);
+    }
+    if (formData.preferredMethod === 'PHONE') {
+      return validatePhone(formData.phoneNumber);
+    }
+    return false;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.description) {
       setToast({ type: 'error', message: 'Description is required' });
       return;
     }
+
+    if (formData.preferredMethod === 'EMAIL' && !validateEmail(formData.email)) {
+      setToast({ type: 'error', message: 'Please provide a valid @gmail.com address' });
+      return;
+    }
+    
+    if (formData.preferredMethod === 'PHONE' && !validatePhone(formData.phoneNumber)) {
+      setToast({ type: 'error', message: 'Please provide a valid Sri Lankan phone number' });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -124,14 +157,63 @@ export default function CreateTicketForm() {
               </div>
             </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase">Preferred Contact Method</label>
+                <div className="relative">
+                  <select
+                    value={formData.preferredMethod}
+                    onChange={e => setFormData({ ...formData, preferredMethod: e.target.value })}
+                    className="w-full appearance-none rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 transition-all focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none"
+                  >
+                    <option value="EMAIL">Email (@gmail.com)</option>
+                    <option value="PHONE">Phone (Sri Lankan)</option>
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-zinc-500">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </div>
+              </div>
+
+              {formData.preferredMethod === 'EMAIL' ? (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <label className="block text-xs font-bold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase">Gmail Address</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                    className={`w-full rounded-xl border bg-zinc-50/50 dark:bg-zinc-950/50 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 transition-all focus:ring-2 focus:ring-violet-500/20 outline-none placeholder:text-zinc-400 ${formData.email && !validateEmail(formData.email) ? 'border-red-500 focus:border-red-500' : 'border-zinc-200 dark:border-zinc-800 focus:border-violet-500'}`}
+                    placeholder="example@gmail.com"
+                  />
+                  {formData.email && !validateEmail(formData.email) && (
+                    <p className="text-[10px] font-bold text-red-500 mt-1 ml-1">Must be a valid @gmail.com address</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  <label className="block text-xs font-bold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase">Phone Number</label>
+                  <input
+                    type="text"
+                    value={formData.phoneNumber}
+                    onChange={e => setFormData({ ...formData, phoneNumber: e.target.value })}
+                    className={`w-full rounded-xl border bg-zinc-50/50 dark:bg-zinc-950/50 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 transition-all focus:ring-2 focus:ring-violet-500/20 outline-none placeholder:text-zinc-400 ${formData.phoneNumber && !validatePhone(formData.phoneNumber) ? 'border-red-500 focus:border-red-500' : 'border-zinc-200 dark:border-zinc-800 focus:border-violet-500'}`}
+                    placeholder="e.g. 077XXXXXXX or +9477XXXXXXX"
+                  />
+                  {formData.phoneNumber && !validatePhone(formData.phoneNumber) && (
+                    <p className="text-[10px] font-bold text-red-500 mt-1 ml-1">Invalid Sri Lankan format (10 digits starting with 0 or +94)</p>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="space-y-2">
-              <label className="block text-xs font-bold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase">Contact Details</label>
+              <label className="block text-xs font-bold tracking-wider text-zinc-500 dark:text-zinc-400 uppercase">Location / Additional Info</label>
               <input
                 type="text"
                 value={formData.contactDetails}
                 onChange={e => setFormData({ ...formData, contactDetails: e.target.value })}
                 className="w-full rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 px-4 py-3 text-sm text-zinc-900 dark:text-zinc-100 transition-all focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 outline-none placeholder:text-zinc-400"
-                placeholder="e.g. Phone number or Room number so we can reach you"
+                placeholder="e.g. Room number or alternative contact info"
               />
             </div>
 
@@ -195,7 +277,7 @@ export default function CreateTicketForm() {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+               disabled={loading || !isFormValid()}
                 className="relative overflow-hidden group px-8 py-2.5 text-sm font-bold text-white rounded-xl shadow-lg shadow-violet-500/30 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
               >
                 <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-violet-600 to-indigo-600 transition-all group-hover:from-indigo-600 group-hover:to-violet-600"></div>

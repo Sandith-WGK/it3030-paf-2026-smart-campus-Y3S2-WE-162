@@ -301,7 +301,17 @@ export default function TechnicianTasksPage() {
             <div className="space-y-6">
               <div className="bg-zinc-50 dark:bg-zinc-950/50 p-5 rounded-2xl border border-zinc-100 dark:border-zinc-800">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-2">Problem Description</label>
-                <p className="text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap">{detailModal.description}</p>
+                <p className="text-[15px] leading-relaxed text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap mb-4">{detailModal.description}</p>
+                
+                <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800">
+                  <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-1">Contact: {detailModal.preferredContactMethod || 'Other'}</label>
+                  <p className="text-sm font-bold text-violet-600 dark:text-violet-400">
+                    {detailModal.preferredContactMethod === 'EMAIL' ? detailModal.email : (detailModal.preferredContactMethod === 'PHONE' ? detailModal.phoneNumber : detailModal.contactDetails)}
+                  </p>
+                  {detailModal.preferredContactMethod && detailModal.contactDetails && (
+                    <p className="text-[11px] text-zinc-500 mt-1 italic">{detailModal.contactDetails}</p>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block mb-3">Evidence Images</label>

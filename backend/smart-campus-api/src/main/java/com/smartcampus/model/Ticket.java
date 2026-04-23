@@ -45,7 +45,11 @@ public class Ticket {
     @Builder.Default
     private TicketStatus status = TicketStatus.OPEN;
 
-    private String contactDetails;     
+    private String contactDetails;    
+    
+    private String preferredContactMethod; 
+    private String email; 
+    private String phoneNumber; 
 
     
     @Builder.Default

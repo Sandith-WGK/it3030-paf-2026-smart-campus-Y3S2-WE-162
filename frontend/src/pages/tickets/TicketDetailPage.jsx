@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, MessageSquare, Paperclip, Trash2, Edit2 } from 'lucide-react';
+import { ArrowLeft, Clock, MessageSquare, Paperclip, Trash2, Edit2,Mail, Phone, MapPin, User, ShieldCheck } from 'lucide-react';
 import Layout from '../../components/layout/Layout';
 import { ticketService } from '../../services/api/ticketService';
 import { commentService } from '../../services/api/commentService';
@@ -140,6 +140,14 @@ export default function TicketDetailPage() {
           {/* Details Column */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-xl p-8 rounded-3xl border border-zinc-200/50 dark:border-zinc-800/50 shadow-xl">
+              {/* Reporter Identity Badge */}
+              <div className="flex items-center gap-2 mb-6 px-4 py-2 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl border border-zinc-100 dark:border-zinc-800 w-fit">
+                <div className="h-6 w-6 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+                  <User size={12} strokeWidth={3} />
+                </div>
+                <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400 uppercase tracking-widest">Reporter ID:</span>
+                <span className="text-xs font-bold text-zinc-900 dark:text-zinc-100">{ticket.reporterId?.substring(0, 8)}...</span>
+              </div>
               <div className="flex justify-between items-start mb-6">
                 <div>
                   <h3 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2 bg-clip-text text-transparent bg-gradient-to-r from-zinc-900 to-zinc-600 dark:from-white dark:to-zinc-400">
@@ -155,14 +163,59 @@ export default function TicketDetailPage() {
                 <p className="whitespace-pre-wrap">{ticket.description}</p>
               </div>
 
-              {ticket.contactDetails && (
-                <div className="mt-6 flex items-center gap-3 p-4 bg-violet-50 dark:bg-violet-900/10 rounded-2xl border border-violet-100 dark:border-violet-900/30 text-sm">
-                  <div className="h-10 w-10 flex justify-center items-center rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-600 dark:text-violet-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              {(ticket.contactDetails || ticket.preferredContactMethod || ticket.preferredMethod) && (
+                <div className="mt-8 space-y-4 p-8 bg-gradient-to-br from-violet-50/50 to-indigo-50/50 dark:from-violet-950/10 dark:to-indigo-950/10 rounded-3xl border border-violet-100 dark:border-violet-900/30 shadow-inner">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="h-12 w-12 flex justify-center items-center rounded-2xl bg-white dark:bg-zinc-900 text-violet-600 dark:text-violet-400 shadow-sm border border-violet-100 dark:border-violet-800">
+                        <MessageSquare size={22} className="opacity-80" />
+                      </div>
+                      <div>
+                        <span className="font-extrabold text-zinc-900 dark:text-zinc-100 text-lg tracking-tight block">Preferred Contact Details</span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-widest ${(ticket.preferredContactMethod || ticket.preferredMethod) === 'EMAIL' ? 'bg-blue-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                            {ticket.preferredContactMethod || ticket.preferredMethod || 'CLIENT'} PREFERRED
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <span className="font-bold text-zinc-900 dark:text-zinc-100 block">Contact Info</span>
-                    <span className="text-zinc-600 dark:text-zinc-400 font-medium">{ticket.contactDetails}</span>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                    {ticket.email && (
+                      <div className={`group p-4 bg-white dark:bg-zinc-900/50 rounded-2xl border transition-all ${(ticket.preferredContactMethod || ticket.preferredMethod) === 'EMAIL' ? 'border-violet-300 dark:border-violet-700 shadow-md ring-1 ring-violet-200 dark:ring-violet-900/30' : 'border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700'}`}>
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                             <Mail size={10} strokeWidth={3} className="text-violet-500" /> Email Address
+                           </span>
+                           {(ticket.preferredContactMethod || ticket.preferredMethod) === 'EMAIL' && (
+                             <ShieldCheck size={14} className="text-violet-500" />
+                           )}
+                         </div>
+                         <span className="text-[15px] text-zinc-900 dark:text-zinc-100 font-bold break-all transition-colors group-hover:text-violet-600 dark:group-hover:text-violet-400">{ticket.email}</span>
+                      </div>
+                    )}
+                    {ticket.phoneNumber && (
+                      <div className={`group p-4 bg-white dark:bg-zinc-900/50 rounded-2xl border transition-all ${(ticket.preferredContactMethod || ticket.preferredMethod) === 'PHONE' ? 'border-violet-300 dark:border-violet-700 shadow-md ring-1 ring-violet-200 dark:ring-violet-900/30' : 'border-zinc-100 dark:border-zinc-800 hover:border-zinc-200 dark:hover:border-zinc-700'}`}>
+                         <div className="flex items-center justify-between mb-2">
+                           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                             <Phone size={10} strokeWidth={3} className="text-violet-500" /> Phone Number
+                           </span>
+                           {(ticket.preferredContactMethod || ticket.preferredMethod) === 'PHONE' && (
+                             <ShieldCheck size={14} className="text-violet-500" />
+                           )}
+                         </div>
+                         <span className="text-[15px] text-zinc-900 dark:text-zinc-100 font-bold transition-colors group-hover:text-violet-600 dark:group-hover:text-violet-400">{ticket.phoneNumber}</span>
+                      </div>
+                    )}
+                    {ticket.contactDetails && (
+                      <div className="p-4 bg-white/50 dark:bg-zinc-950/20 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800 sm:col-span-2">
+                         <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5 mb-2">
+                           <MapPin size={10} strokeWidth={3} className="text-zinc-500" /> Additional Info / Location
+                         </span>
+                         <span className="text-sm text-zinc-800 dark:text-zinc-300 font-medium leading-relaxed italic opacity-90">{ticket.contactDetails}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
