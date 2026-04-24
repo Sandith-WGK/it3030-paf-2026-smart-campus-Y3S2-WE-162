@@ -32,7 +32,7 @@ export default function RecentlyBooked({ refreshKey = 0, limit = 5 }) {
       const payload = res.data?.data ?? res.data;
       const rows = Array.isArray(payload) ? payload : [];
       setItems(rows.filter((item) => !EXCLUDED_STATUSES.has(item.status)));
-    } catch (error) {
+    } catch {
       setItems([]);
     } finally {
       setLoading(false);
