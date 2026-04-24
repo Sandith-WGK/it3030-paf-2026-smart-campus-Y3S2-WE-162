@@ -11,6 +11,10 @@ const bookingService = {
   getMyBookings: (status, page = 0, size = 20) =>
     api.get(`${BASE}/my`, { params: { ...(status ? { status } : {}), page, size } }),
 
+  // GET /bookings/my/recent?limit=...
+  getRecentBookings: (limit = 5) =>
+    api.get(`${BASE}/my/recent`, { params: { limit } }),
+
   // GET /bookings?status=...&resourceId=...&userId=...&date=...
   getAllBookings: (filters = {}) => api.get(BASE, { params: filters }),
 

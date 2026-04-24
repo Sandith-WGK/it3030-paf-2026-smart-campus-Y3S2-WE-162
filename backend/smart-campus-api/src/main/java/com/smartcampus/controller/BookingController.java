@@ -77,6 +77,18 @@ public class BookingController {
                 .body(ApiResponse.success("Bookings retrieved successfully", bookings));
     }
 
+    // ── GET /api/v1/bookings/my/recent ───────────────────────────────────────
+    // Get the authenticated user's most recent bookings for quick sidebar access.
+    @GetMapping("/my/recent")
+    public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyRecentBookings(
+            @RequestParam(defaultValue = "5") int limit,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<BookingResponse> bookings = bookingService.getMyRecentBookings(principal.getId(), limit);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ApiResponse.success("Recent bookings retrieved successfully", bookings));
+    }
+
     // ── GET /api/v1/bookings/resource-schedule ───────────────────────────────
     // Get APPROVED bookings for a specific resource on a given date.
     // Available to all authenticated users — used to show timeline availability.

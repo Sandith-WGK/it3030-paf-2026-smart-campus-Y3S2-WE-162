@@ -121,6 +121,23 @@ public class BookingService {
         return queryBookingsWithPagination(query, page, size, userId);
     }
 
+    public List<BookingResponse> getMyRecentBookings(String userId, int limit) {
+        int safeLimit = Math.max(1, Math.min(limit, 10));
+        Query query = new Query()
+                .addCriteria(Criteria.where("userId").is(userId))
+                .addCriteria(Criteria.where("status").ne(BookingStatus.PENDING))
+                .with(Sort.by(Sort.Direction.DESC, "date", "startTime"))
+                .limit(safeLimit);
+
+        List<Booking> bookings = mongoTemplate.find(query, Booking.class);
+        Map<String, Resource> resourceMap = buildResourceMap(bookings);
+        User user = userRepository.findById(userId).orElse(null);
+
+        return bookings.stream()
+                .map(b -> BookingResponse.from(b, resourceMap.get(b.getResourceId()), user))
+                .collect(Collectors.toList());
+    }
+
     public PagedResponse<BookingResponse> getAllBookings(BookingStatus status, String resourceId,
                                                          String userId, LocalDate date, int page, int size) {
         Query query = new Query();
