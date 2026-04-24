@@ -15,6 +15,10 @@ const bookingService = {
   getRecentBookings: (limit = 5) =>
     api.get(`${BASE}/my/recent`, { params: { limit } }),
 
+  // GET /bookings/my/most-booked?limit=...
+  getMostBooked: (limit = 5) =>
+    api.get(`${BASE}/my/most-booked`, { params: { limit } }),
+
   // GET /bookings?status=...&resourceId=...&userId=...&date=...
   getAllBookings: (filters = {}) => api.get(BASE, { params: filters }),
 

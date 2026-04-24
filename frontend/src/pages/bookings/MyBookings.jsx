@@ -5,6 +5,7 @@ import { Plus, CalendarDays, List, ChevronLeft, ChevronRight } from 'lucide-reac
 import Layout from '../../components/layout/Layout';
 import BookingCard from '../../components/booking/BookingCard';
 import RecentlyBooked from '../../components/booking/RecentlyBooked';
+import MostlyBooked from '../../components/booking/MostlyBooked';
 import ConfirmModal from '../../components/booking/ConfirmModal';
 import Toast from '../../components/common/Toast';
 import EmptyState from '../../components/common/EmptyState';
@@ -394,7 +395,10 @@ export default function MyBookings() {
         </div>
 
         <aside className="lg:col-span-3">
-          <RecentlyBooked refreshKey={recentRefreshKey} />
+          <div className="space-y-4">
+            <RecentlyBooked refreshKey={recentRefreshKey} />
+            <MostlyBooked refreshKey={recentRefreshKey} />
+          </div>
         </aside>
       </div>
 

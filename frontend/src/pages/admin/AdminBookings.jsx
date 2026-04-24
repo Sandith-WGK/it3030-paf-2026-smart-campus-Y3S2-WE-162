@@ -49,15 +49,6 @@ function todayInTimezone(timeZone) {
   return `${year}-${month}-${day}`;
 }
 
-// Pending bookings always surface first, then sort by date descending
-function sortBookings(list) {
-  return [...list].sort((a, b) => {
-    if (a.status === 'PENDING' && b.status !== 'PENDING') return -1;
-    if (a.status !== 'PENDING' && b.status === 'PENDING') return 1;
-    return (b.date ?? '').localeCompare(a.date ?? '');
-  });
-}
-
 export default function AdminBookings() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -95,7 +86,7 @@ export default function AdminBookings() {
       .then((res) => {
         const raw = res.data?.data ?? res.data;
         const list = Array.isArray(raw?.content) ? raw.content : Array.isArray(raw) ? raw : [];
-        setBookings(sortBookings(list));
+        setBookings(list);
         setHasMore(Boolean(raw?.hasNext));
       })
       .catch(() => {
@@ -263,7 +254,7 @@ export default function AdminBookings() {
       }
     }
 
-    return sortBookings(rows);
+    return rows;
   }, [filters]);
 
   const getRowsForExport = useCallback(async () => (
@@ -522,7 +513,9 @@ export default function AdminBookings() {
       ) : (
         <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 overflow-hidden">
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-zinc-100 dark:border-zinc-800">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">{tableScopeLabel}</p>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              {tableScopeLabel} Sorted by pending urgency (overdue, today, upcoming), then recent history.
+            </p>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               Bulk approve eligibility: pending bookings only.
             </p>
