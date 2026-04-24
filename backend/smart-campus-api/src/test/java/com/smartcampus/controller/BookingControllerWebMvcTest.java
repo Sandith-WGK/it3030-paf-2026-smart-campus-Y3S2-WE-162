@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartcampus.dto.PagedResponse;
 import com.smartcampus.dto.booking.BookingRequest;
 import com.smartcampus.dto.booking.BookingResponse;
+import com.smartcampus.dto.booking.MostBookedResourceResponse;
 import com.smartcampus.exception.BookingConflictException;
 import com.smartcampus.exception.GlobalExceptionHandler;
 import com.smartcampus.exception.ResourceNotFoundException;
@@ -38,6 +39,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -181,6 +183,45 @@ class BookingControllerWebMvcTest {
         mockMvc.perform(get("/api/v1/bookings"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void getMyMostBookedResources_returns200_forAuthenticatedUser() throws Exception {
+        List<MostBookedResourceResponse> rows = List.of(
+                MostBookedResourceResponse.builder()
+                        .resourceId("res-1")
+                        .resourceName("Chemistry Lab 301")
+                        .bookCount(4)
+                        .latestBookingId("booking-77")
+                        .build()
+        );
+        when(bookingService.getMyMostBookedResources("user-1", 5)).thenReturn(rows);
+
+        mockMvc.perform(get("/api/v1/bookings/my/most-booked")
+                        .with(authentication(userAuth("user-1", "USER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].resourceId").value("res-1"))
+                .andExpect(jsonPath("$.data[0].bookCount").value(4))
+                .andExpect(jsonPath("$.data[0].latestBookingId").value("booking-77"));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    void expirePastPendingBookingsNow_returns403_forNonAdmin() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/admin/expire-pending"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "ADMIN")
+    void expirePastPendingBookingsNow_returns200_forAdmin() throws Exception {
+        mockMvc.perform(post("/api/v1/bookings/admin/expire-pending"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Past pending bookings expired successfully"));
+
+        verify(bookingService).expirePastPendingBookings();
     }
 
     private UsernamePasswordAuthenticationToken userAuth(String userId, String role) {

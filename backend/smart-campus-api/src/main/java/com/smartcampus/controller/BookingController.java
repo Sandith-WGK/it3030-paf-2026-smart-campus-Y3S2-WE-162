@@ -7,6 +7,7 @@ import com.smartcampus.dto.booking.BookingRejectRequest;
 import com.smartcampus.dto.booking.BookingRequest;
 import com.smartcampus.dto.booking.BookingResponse;
 import com.smartcampus.dto.booking.BookingUpdateRequest;
+import com.smartcampus.dto.booking.MostBookedResourceResponse;
 import com.smartcampus.model.BookingStatus;
 import com.smartcampus.security.UserPrincipal;
 import com.smartcampus.service.BookingService;
@@ -87,6 +88,18 @@ public class BookingController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noCache())
                 .body(ApiResponse.success("Recent bookings retrieved successfully", bookings));
+    }
+
+    // ── GET /api/v1/bookings/my/most-booked ──────────────────────────────────
+    // Get the authenticated user's most booked resources for quick rebooking.
+    @GetMapping("/my/most-booked")
+    public ResponseEntity<ApiResponse<List<MostBookedResourceResponse>>> getMyMostBookedResources(
+            @RequestParam(defaultValue = "5") int limit,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        List<MostBookedResourceResponse> rows = bookingService.getMyMostBookedResources(principal.getId(), limit);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noCache())
+                .body(ApiResponse.success("Most booked resources retrieved successfully", rows));
     }
 
     // ── GET /api/v1/bookings/resource-schedule ───────────────────────────────
@@ -219,6 +232,15 @@ public class BookingController {
     public ResponseEntity<ApiResponse<BookingAnalyticsResponse>> getBookingAnalytics() {
         BookingAnalyticsResponse analytics = bookingService.getBookingAnalytics();
         return ResponseEntity.ok(ApiResponse.success("Analytics retrieved successfully", analytics));
+    }
+
+    // ── POST /api/v1/bookings/admin/expire-pending ──────────────────────────
+    // Admin-only manual trigger for demo/ops to expire stale pending bookings.
+    @PostMapping("/admin/expire-pending")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> expirePastPendingBookingsNow() {
+        bookingService.expirePastPendingBookings();
+        return ResponseEntity.ok(ApiResponse.success("Past pending bookings expired successfully", null));
     }
 
     // ── GET /api/v1/bookings/{id}/verify ─────────────────────────────────────
