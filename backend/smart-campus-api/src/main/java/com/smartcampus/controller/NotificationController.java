@@ -16,13 +16,26 @@ import java.util.List;
 
 /**
  * VIVA PREP: This is the CRUD Controller for Notification Management.
- * It follows RESTful conventions:
+ *
+ * REST CONSTRAINT #3 - LAYERED SYSTEM:
+ *   This Controller is Layer 1. It delegates to NotificationService (Layer 2),
+ *   which delegates to NotificationRepository (Layer 3 - MongoDB).
+ *   Each layer only knows about the one directly below it.
+ *
+ * REST CONSTRAINT #4 - UNIFORM INTERFACE:
+ *   All endpoints use /api/v1/notifications as the base URL (proper noun-based naming).
+ *   Standard HTTP methods: GET (read), PUT (update), DELETE (remove).
+ *   Standard status codes: 200 OK (data returned), 204 No Content (success, no data).
+ *
+ * REST CONSTRAINT #5 - CACHEABILITY:
+ *   All @GetMapping endpoints return standard HTTP 200 responses.
+ *   Browsers and CDNs can cache GET responses to reduce server load.
+ *
+ * CRUD Mapping:
  *   CREATE -> Notifications are created internally by NotificationService (no POST endpoint needed).
  *   READ   -> GET    /api/v1/notifications/user/{userId}  (active) or /history (all)
  *   UPDATE -> PUT    /api/v1/notifications/{id}/read  (mark as read)
  *   DELETE -> DELETE /api/v1/notifications/{id}  (single) or /user/{userId} (all)
- * Uses DTOs (NotificationDto) to avoid exposing internal MongoDB document structures.
- * Method-level security (@PreAuthorize) ensures users can only access their own data.
  */
 @RestController
 @RequestMapping("/api/v1/notifications")

@@ -17,6 +17,22 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * REST CONSTRAINT #2 - STATELESSNESS:
+ *   Line 52: SessionCreationPolicy.IF_REQUIRED ensures no server-side session is maintained
+ *   for API requests. Every HTTP request must include a JWT token in the Authorization header.
+ *   The server never "remembers" who you are between requests.
+ *
+ * REST CONSTRAINT #1 - CLIENT-SERVER:
+ *   This entire SecurityConfig file is part of the SERVER layer (Spring Boot).
+ *   It is completely independent of the CLIENT layer (React frontend at localhost:5173).
+ *   The two communicate exclusively through HTTP/REST API calls.
+ *
+ * REST CONSTRAINT #4 - UNIFORM INTERFACE:
+ *   Line 54: All public endpoints follow the pattern /api/v1/auth/**.
+ *   All protected endpoints require a standard Authorization header with a Bearer token.
+ *   This consistency is the Uniform Interface constraint in action.
+ */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity // enables @PreAuthorize("hasRole('ADMIN')")
