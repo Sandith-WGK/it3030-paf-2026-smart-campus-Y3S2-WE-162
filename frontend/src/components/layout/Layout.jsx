@@ -5,19 +5,20 @@ import Navbar from '../Navbar';
 
 const DESKTOP_SIDEBAR_KEY = 'sc.sidebar.collapsed';
 
+function getInitialDesktopSidebarCollapsed() {
+  try {
+    const saved = window.localStorage.getItem(DESKTOP_SIDEBAR_KEY);
+    if (saved === 'true') return true;
+    if (saved === 'false') return false;
+  } catch {
+    // Ignore storage issues and keep default expanded state.
+  }
+  return false;
+}
+
 export default function Layout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(DESKTOP_SIDEBAR_KEY);
-      if (saved === 'true') setDesktopSidebarCollapsed(true);
-      if (saved === 'false') setDesktopSidebarCollapsed(false);
-    } catch {
-      // Ignore storage issues and keep default expanded state.
-    }
-  }, []);
+  const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(getInitialDesktopSidebarCollapsed);
 
   useEffect(() => {
     try {
