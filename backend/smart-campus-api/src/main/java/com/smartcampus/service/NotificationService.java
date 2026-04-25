@@ -45,35 +45,39 @@ public class NotificationService {
     public void sendNotification(String userId, String message, NotifType type, Severity severity, 
                                  String referenceId, String referenceType) {
         
-        // Innovation: Check user preferences
+        // VIVA PREP: NOTIFICATION CATEGORY FILTERING
+        // This block checks the user's saved NotificationPreference (from Settings page).
+        // If the user toggled OFF a category (e.g., "Booking Updates"), we silently
+        // block the notification here — it is never saved to MongoDB, never pushed via
+        // WebSocket, and never emailed. This is where the Settings page toggles take effect.
         User user = userRepository.findById(userId).orElse(null);
         if (user != null && user.getNotificationPreferences() != null) {
             boolean enabled = true;
             if (referenceType != null) {
                 switch (referenceType.toUpperCase()) {
-                    case "BOOKING":
+                    case "BOOKING":        // Maps to: NotificationPreference.bookings
                         enabled = user.getNotificationPreferences().isBookings();
                         break;
-                    case "TICKET":
+                    case "TICKET":         // Maps to: NotificationPreference.tickets
                         enabled = user.getNotificationPreferences().isTickets();
                         break;
-                    case "USER":
-                    case "SECURITY":
+                    case "USER":           // Maps to: NotificationPreference.security
+                    case "SECURITY":       // Both USER and SECURITY events use the security toggle
                         enabled = user.getNotificationPreferences().isSecurity();
                         break;
-                    case "RESOURCE":
+                    case "RESOURCE":       // Maps to: NotificationPreference.resources
                         enabled = user.getNotificationPreferences().isResources();
                         break;
-                    case "ANNOUNCEMENT":
+                    case "ANNOUNCEMENT":   // Maps to: NotificationPreference.announcements
                         enabled = user.getNotificationPreferences().isAnnouncements();
                         break;
                     default:
-                        enabled = true;
+                        enabled = true;    // Unknown categories are always delivered
                 }
             }
             if (!enabled) {
                 log.info("Notification suppressed by user preferences for user {}", userId);
-                return;
+                return; // EXIT: Notification is completely blocked — never saved, pushed, or emailed.
             }
         }
 

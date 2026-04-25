@@ -1,3 +1,14 @@
+/**
+ * REST CONSTRAINT #6 - CODE ON DEMAND (Optional):
+ *   This entire React application is JavaScript code that the Vite server sends
+ *   to the user's browser to execute dynamically. The browser downloads and runs
+ *   this code on demand — it doesn't exist on the client until the server delivers it.
+ *
+ * REST CONSTRAINT #1 - CLIENT-SERVER:
+ *   This file is the CLIENT layer. It is completely independent of the Spring Boot SERVER.
+ *   All data is fetched via HTTP API calls (e.g., axios.get('/api/v1/users')).
+ *   The frontend and backend can be developed, deployed, and scaled independently.
+ */
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
